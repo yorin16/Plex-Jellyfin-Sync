@@ -9,7 +9,7 @@ services:
       APP_ENV: prod
       APP_SECRET: ${APP_SECRET}
       DATABASE_URL: mysql://${DB_USER:-media_sync}:${DB_PASSWORD}@${MYSQL_HOST:-MariaDB-Official}:3306/${DB_NAME:-media_sync}?serverVersion=${MARIADB_VERSION:-mariadb-12.3}&charset=utf8mb4
-      MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
+      MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=1
     networks:
       - app_network
     restart: unless-stopped
@@ -25,7 +25,7 @@ services:
       APP_ENV: prod
       APP_SECRET: ${APP_SECRET}
       DATABASE_URL: mysql://${DB_USER:-media_sync}:${DB_PASSWORD}@${MYSQL_HOST:-MariaDB-Official}:3306/${DB_NAME:-media_sync}?serverVersion=${MARIADB_VERSION:-mariadb-12.3}&charset=utf8mb4
-      MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
+      MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=1
     depends_on:
       - php
     networks:
