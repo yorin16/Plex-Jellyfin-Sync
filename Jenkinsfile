@@ -2,30 +2,33 @@ pipeline {
     agent any
 
     environment {
-        // Unraid: app files live under appdata, not /opt
         APP_DIR = '/mnt/user/appdata/media-sync'
+        REPO_URL = 'https://github.com/yorin16/Plex-Jellyfin-Sync.git'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                sh """
-                    if [ -d "${APP_DIR}/.git" ]; then
-                        git -C ${APP_DIR} pull origin main
-                    else
-                        git clone https://github.com/yorin/Plex-Jellyfin-Sync.git ${APP_DIR}
-                    fi
-                """
+                withCredentials([usernamePassword(
+                    credentialsId: 'github-token',
+                    usernameVariable: 'GIT_USER',
+                    passwordVariable: 'GIT_TOKEN'
+                )]) {
+                    sh """
+                        if [ -d "${APP_DIR}/.git" ]; then
+                            git -C ${APP_DIR} pull https://${GIT_USER}:${GIT_TOKEN}@github.com/yorin16/Plex-Jellyfin-Sync.git main
+                        else
+                            mkdir -p ${APP_DIR}
+                            git clone https://${GIT_USER}:${GIT_TOKEN}@github.com/yorin16/Plex-Jellyfin-Sync.git ${APP_DIR}
+                        fi
+                    """
+                }
             }
         }
 
-        stage('Build & Deploy') {
+        stage('Deploy') {
             steps {
-                dir("${APP_DIR}") {
-                    // Docker builds everything — Vue (npm inside container), PHP image.
-                    // No Node.js or Composer needed on this machine.
-                    sh 'docker compose up --build -d'
-                }
+                sh "docker compose -f ${APP_DIR}/docker-compose.yml up --build -d"
             }
         }
 
