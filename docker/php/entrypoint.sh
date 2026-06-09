@@ -17,7 +17,8 @@ try {
 done
 echo "MySQL ready."
 
-php bin/console cache:clear --no-warmup
+php bin/console cache:clear
+chmod -R 777 var/
 php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 
 exec "$@"
