@@ -9,6 +9,7 @@ until php bin/console doctrine:query:sql "SELECT 1" > /dev/null 2>&1; do
 done
 echo "MySQL ready."
 
+php bin/console cache:clear --no-warmup
 php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
 
 exec "$@"

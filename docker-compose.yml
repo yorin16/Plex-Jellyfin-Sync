@@ -1,14 +1,14 @@
 services:
   php:
     build:
-      context: ./docker/php
+      context: .
+      dockerfile: docker/php/Dockerfile
     volumes:
-      - ./backend:/var/www/html
       - ${PLEX_MEDIA_PATH:-/mnt/user/Media/Movies}:/var/media/source:ro
     environment:
       APP_ENV: prod
       APP_SECRET: ${APP_SECRET}
-      DATABASE_URL: mysql://${DB_USER:-media_sync}:${DB_PASSWORD}@${MYSQL_HOST:-MariaDB-Official}:3306/${DB_NAME:-media_sync}?serverVersion=${MARIADB_VERSION:-mariadb-10.11}&charset=utf8mb4
+      DATABASE_URL: mysql://${DB_USER:-media_sync}:${DB_PASSWORD}@${MYSQL_HOST:-MariaDB-Official}:3306/${DB_NAME:-media_sync}?serverVersion=${MARIADB_VERSION:-mariadb-12.3}&charset=utf8mb4
       MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
     networks:
       - app_network
@@ -16,15 +16,15 @@ services:
 
   worker:
     build:
-      context: ./docker/php
+      context: .
+      dockerfile: docker/php/Dockerfile
     command: php bin/console messenger:consume async --time-limit=3600 -vv
     volumes:
-      - ./backend:/var/www/html
       - ${PLEX_MEDIA_PATH:-/mnt/user/Media/Movies}:/var/media/source:ro
     environment:
       APP_ENV: prod
       APP_SECRET: ${APP_SECRET}
-      DATABASE_URL: mysql://${DB_USER:-media_sync}:${DB_PASSWORD}@${MYSQL_HOST:-MariaDB-Official}:3306/${DB_NAME:-media_sync}?serverVersion=${MARIADB_VERSION:-mariadb-10.11}&charset=utf8mb4
+      DATABASE_URL: mysql://${DB_USER:-media_sync}:${DB_PASSWORD}@${MYSQL_HOST:-MariaDB-Official}:3306/${DB_NAME:-media_sync}?serverVersion=${MARIADB_VERSION:-mariadb-12.3}&charset=utf8mb4
       MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=0
     depends_on:
       - php
@@ -44,8 +44,6 @@ services:
       context: ./docker/nginx
     ports:
       - "${APP_PORT:-8085}:80"
-    volumes:
-      - ./backend/public:/var/www/html/public:ro
     depends_on:
       - php
       - frontend
