@@ -1,34 +1,11 @@
 pipeline {
     agent any
 
-    environment {
-        APP_DIR = '/mnt/user/appdata/media-sync'
-        REPO_URL = 'https://github.com/yorin16/Plex-Jellyfin-Sync.git'
-    }
-
     stages {
-        stage('Checkout') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'github-token',
-                    usernameVariable: 'GIT_USER',
-                    passwordVariable: 'GIT_TOKEN'
-                )]) {
-                    sh """
-                        if [ -d "${APP_DIR}/.git" ]; then
-                            git -C ${APP_DIR} pull https://${GIT_USER}:${GIT_TOKEN}@github.com/yorin16/Plex-Jellyfin-Sync.git main
-                        else
-                            mkdir -p ${APP_DIR}
-                            git clone https://${GIT_USER}:${GIT_TOKEN}@github.com/yorin16/Plex-Jellyfin-Sync.git ${APP_DIR}
-                        fi
-                    """
-                }
-            }
-        }
-
         stage('Deploy') {
             steps {
-                sh "docker compose -f ${APP_DIR}/docker-compose.yml up --build -d"
+                // Jenkins already checked out the repo to ${WORKSPACE} — just deploy from there
+                sh "docker compose -f ${WORKSPACE}/docker-compose.yml --project-directory ${WORKSPACE} up --build -d"
             }
         }
 
