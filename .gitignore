@@ -1,5 +1,5 @@
 # Docker env
-.env
+/.env
 
 # Symfony
 backend/vendor/
