@@ -17,6 +17,7 @@ WORKDIR /var/www/html
 # Copy backend source and install dependencies
 COPY backend/ .
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts \
+    && mkdir -p var/cache var/log \
     && chmod -R 777 var/
 
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/app.ini
