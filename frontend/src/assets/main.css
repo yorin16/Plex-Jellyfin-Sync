@@ -1,0 +1,31 @@
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #1a1d27; }
+::-webkit-scrollbar-thumb { background: #2d3148; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #3d4468; }
+
+/* Table */
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b; padding: 8px 12px; border-bottom: 1px solid #2d3148; }
+td { padding: 10px 12px; border-bottom: 1px solid #1e2235; }
+tr:hover td { background: #1e2235; }
+
+/* Progress bar */
+.progress-bar {
+  height: 6px;
+  background: #1e293b;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: #7c6af7;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+/* Checkbox */
+input[type=checkbox] {
+  width: auto;
+  accent-color: #7c6af7;
+}
