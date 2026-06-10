@@ -45,7 +45,9 @@ class RsyncTransferDriver implements TransferDriverInterface
 
         // -rlt: recursive, preserve symlinks and timestamps; skip -pog (owner/group/perms)
         // which fail when the destination user isn't root.
-        $cmd = 'rsync -rlt --info=progress2 --no-inc-recursive'
+        // --outbuf=U: force unbuffered output so progress lines are flushed immediately
+        // when stdout is a pipe (default is block-buffered, meaning output arrives all at once).
+        $cmd = 'rsync -rlt --outbuf=U --info=progress2 --no-inc-recursive'
             . ' -e ' . escapeshellarg('ssh ' . $sshArgs)
             . ' ' . escapeshellarg(rtrim($sourceAbsPath, '/') . '/')
             . ' ' . escapeshellarg($username . '@' . $host . ':' . $destPath . '/');
