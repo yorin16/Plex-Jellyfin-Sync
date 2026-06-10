@@ -43,7 +43,9 @@ class RsyncTransferDriver implements TransferDriverInterface
             $sshArgs .= ' -i ' . escapeshellarg($keyPath);
         }
 
-        $cmd = 'rsync -a --info=progress2 --no-inc-recursive'
+        // -rlt: recursive, preserve symlinks and timestamps; skip -pog (owner/group/perms)
+        // which fail when the destination user isn't root.
+        $cmd = 'rsync -rlt --info=progress2 --no-inc-recursive'
             . ' -e ' . escapeshellarg('ssh ' . $sshArgs)
             . ' ' . escapeshellarg(rtrim($sourceAbsPath, '/') . '/')
             . ' ' . escapeshellarg($username . '@' . $host . ':' . $destPath . '/');
@@ -55,34 +57,65 @@ class RsyncTransferDriver implements TransferDriverInterface
         $totalBytes = $this->calculateSize($sourceAbsPath);
         $lastReport = time();
 
-        $proc = proc_open($cmd, [1 => ['pipe', 'r'], 2 => ['pipe', 'r']], $pipes);
+        $proc = proc_open($cmd, [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'r'],
+            2 => ['pipe', 'r'],
+        ], $pipes);
+
         if (!is_resource($proc)) {
             throw new \RuntimeException('Failed to start rsync process');
         }
 
-        $stderr = '';
-        while (!feof($pipes[1])) {
-            $line = fgets($pipes[1]);
-            if ($line === false) {
+        fclose($pipes[0]);
+        stream_set_blocking($pipes[1], false);
+        stream_set_blocking($pipes[2], false);
+
+        $stdoutBuf = '';
+        $stderrBuf = '';
+
+        while (true) {
+            $read = array_values(array_filter([$pipes[1], $pipes[2]], fn($p) => is_resource($p) && !feof($p)));
+            if (empty($read)) {
                 break;
             }
-            // --info=progress2: "      58,985,472  30%  112.53MB/s    0:00:22"
-            if (preg_match('/^\s*([\d,]+)\s+\d+%/', $line, $m)) {
-                $bytesCopied = (int) str_replace(',', '', $m[1]);
-                if (time() - $lastReport >= 5) {
-                    ($onProgress)($bytesCopied, $totalBytes);
-                    $lastReport = time();
+
+            $write = $except = [];
+            stream_select($read, $write, $except, 0, 200000);
+
+            foreach ($read as $pipe) {
+                $chunk = fread($pipe, 65536);
+                if ($chunk === false || $chunk === '') {
+                    continue;
+                }
+                if ($pipe === $pipes[1]) {
+                    $stdoutBuf .= $chunk;
+                } else {
+                    $stderrBuf .= $chunk;
+                }
+            }
+
+            // rsync --info=progress2 uses \r between updates, \n at the end of summary lines
+            $parts = preg_split('/[\r\n]+/', $stdoutBuf);
+            $stdoutBuf = array_pop($parts);
+
+            foreach ($parts as $line) {
+                if (preg_match('/^\s*([\d,]+)\s+\d+%/', $line, $m)) {
+                    $bytesCopied = (int) str_replace(',', '', $m[1]);
+                    if (time() - $lastReport >= 5) {
+                        ($onProgress)($bytesCopied, $totalBytes);
+                        $lastReport = time();
+                    }
                 }
             }
         }
 
-        $stderr = stream_get_contents($pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
         $exitCode = proc_close($proc);
 
         if ($exitCode !== 0) {
-            throw new \RuntimeException("rsync failed (exit {$exitCode}): " . trim($stderr));
+            throw new \RuntimeException('rsync failed (exit ' . $exitCode . '): ' . trim($stderrBuf));
         }
 
         ($onProgress)($totalBytes, $totalBytes);
