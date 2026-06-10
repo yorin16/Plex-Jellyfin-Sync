@@ -73,25 +73,30 @@ class RsyncTransferDriver implements TransferDriverInterface
 
         $stdoutBuf = '';
         $stderrBuf = '';
+        $stdoutDone = false;
+        $stderrDone = false;
 
-        while (true) {
-            $read = array_values(array_filter([$pipes[1], $pipes[2]], fn($p) => is_resource($p) && !feof($p)));
-            if (empty($read)) {
-                break;
-            }
+        while (!$stdoutDone || !$stderrDone) {
+            $read = [];
+            if (!$stdoutDone) $read[] = $pipes[1];
+            if (!$stderrDone) $read[] = $pipes[2];
 
-            $write = $except = [];
-            stream_select($read, $write, $except, 0, 200000);
+            $write = $except = null;
+            $n = @stream_select($read, $write, $except, 0, 200000);
 
-            foreach ($read as $pipe) {
-                $chunk = fread($pipe, 65536);
-                if ($chunk === false || $chunk === '') {
-                    continue;
-                }
-                if ($pipe === $pipes[1]) {
-                    $stdoutBuf .= $chunk;
-                } else {
-                    $stderrBuf .= $chunk;
+            if ($n > 0) {
+                foreach ($read as $pipe) {
+                    $chunk = @fread($pipe, 65536);
+                    if ($chunk === false || $chunk === '') {
+                        if ($pipe === $pipes[1]) $stdoutDone = true;
+                        else $stderrDone = true;
+                        continue;
+                    }
+                    if ($pipe === $pipes[1]) {
+                        $stdoutBuf .= $chunk;
+                    } else {
+                        $stderrBuf .= $chunk;
+                    }
                 }
             }
 
@@ -110,8 +115,8 @@ class RsyncTransferDriver implements TransferDriverInterface
             }
         }
 
-        fclose($pipes[1]);
-        fclose($pipes[2]);
+        @fclose($pipes[1]);
+        @fclose($pipes[2]);
         $exitCode = proc_close($proc);
 
         if ($exitCode !== 0) {
