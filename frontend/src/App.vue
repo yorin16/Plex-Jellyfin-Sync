@@ -9,7 +9,23 @@
       <router-view />
     </main>
   </div>
+
+  <div class="toast-container">
+    <div
+      v-for="t in toasts"
+      :key="t.id"
+      class="toast"
+      :class="'toast-' + t.type"
+    >
+      {{ t.message }}
+    </div>
+  </div>
 </template>
+
+<script setup>
+import { useToast } from '@/composables/useToast'
+const { toasts } = useToast()
+</script>
 
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -108,4 +124,29 @@ input:focus, select:focus { border-color: #7c6af7; }
 
 .form-group { margin-bottom: 16px; }
 .form-group label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px; }
+
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 9999;
+}
+.toast {
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  animation: toast-in 0.2s ease;
+}
+.toast-success { background: #064e3b; color: #6ee7b7; border: 1px solid #065f46; }
+.toast-error   { background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b; }
+.toast-info    { background: #1e3a5f; color: #93c5fd; border: 1px solid #1e40af; }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 </style>

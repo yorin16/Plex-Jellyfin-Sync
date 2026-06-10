@@ -180,10 +180,12 @@
 import { ref, computed, reactive, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { comparison, jobs, overrides } from '@/api'
+import { useToast } from '@/composables/useToast'
 
 const route = useRoute()
 const profileId = Number(route.params.id)
 
+const { show: toast } = useToast()
 const loading = ref(false)
 const error = ref(null)
 const onlyInSource = ref([])
@@ -237,11 +239,14 @@ function toggleSelect(id) {
 
 async function queueOne(id) {
   await jobs.queue(profileId, [id])
+  toast('Added to queue')
 }
 
 async function queueSelected() {
+  const count = selectedIds.size
   await jobs.queue(profileId, [...selectedIds])
   selectedIds.clear()
+  toast(`${count} movie${count !== 1 ? 's' : ''} added to queue`)
 }
 
 async function ignore(id) {

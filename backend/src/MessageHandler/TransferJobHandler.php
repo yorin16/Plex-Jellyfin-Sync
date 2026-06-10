@@ -6,6 +6,7 @@ use App\Entity\TransferJob;
 use App\Message\TransferJobMessage;
 use App\Repository\TransferJobRepository;
 use App\Service\Jellyfin\JellyfinClient;
+use App\Service\Jellyfin\JellyfinScanner;
 use App\Service\Transfer\TransferDriverRegistry;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -18,6 +19,7 @@ class TransferJobHandler
         private readonly TransferJobRepository $jobRepo,
         private readonly TransferDriverRegistry $driverRegistry,
         private readonly JellyfinClient $jellyfinClient,
+        private readonly JellyfinScanner $jellyfinScanner,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
     ) {}
@@ -121,6 +123,8 @@ class TransferJobHandler
         foreach ($profile->getConnections() as $conn) {
             if ($conn->getType() === 'jellyfin') {
                 $this->jellyfinClient->triggerLibraryScan($conn->getUrl(), $conn->getApiToken());
+                sleep(20);
+                $this->jellyfinScanner->scan($conn);
                 break;
             }
         }

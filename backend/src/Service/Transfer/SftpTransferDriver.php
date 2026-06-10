@@ -35,6 +35,11 @@ class SftpTransferDriver implements TransferDriverInterface
         $destBase = rtrim($config['dest_base_path'] ?? '', '/');
 
         $sftp = new SFTP($host, $port);
+        $sftp->setPreferredAlgorithms([
+            'crypt' => ['aes128-ctr', 'aes128-cbc', 'aes256-ctr'],
+            'mac'   => ['umac-64@openssh.com', 'hmac-sha1', 'hmac-sha2-256'],
+        ]);
+        $sftp->setPreferredSize(8 * 1024 * 1024);
 
         if ($keyPath && file_exists($keyPath)) {
             $key = \phpseclib3\Crypt\PublicKeyLoader::load(file_get_contents($keyPath));
