@@ -55,7 +55,7 @@ class RsyncTransferDriver implements TransferDriverInterface
         }
 
         $totalBytes = $this->calculateSize($sourceAbsPath);
-        $lastReport = time();
+        $lastReport = 0; // fire first update immediately
 
         $proc = proc_open($cmd, [
             0 => ['pipe', 'r'],
@@ -75,6 +75,22 @@ class RsyncTransferDriver implements TransferDriverInterface
         $stderrBuf = '';
         $stdoutDone = false;
         $stderrDone = false;
+
+        // rsync --info=progress2 writes to stderr on some versions, stdout on others.
+        // Parse both so progress is captured regardless.
+        $parseProgress = function (string &$buf) use ($totalBytes, &$lastReport, $onProgress): void {
+            $parts = preg_split('/[\r\n]+/', $buf);
+            $buf = (string) array_pop($parts);
+            foreach ($parts as $line) {
+                if (preg_match('/^\s*([\d,]+)\s+\d+%/', $line, $m)) {
+                    $bytesCopied = (int) str_replace(',', '', $m[1]);
+                    if (time() - $lastReport >= 2) {
+                        ($onProgress)($bytesCopied, $totalBytes);
+                        $lastReport = time();
+                    }
+                }
+            }
+        };
 
         while (!$stdoutDone || !$stderrDone) {
             $read = [];
@@ -100,19 +116,8 @@ class RsyncTransferDriver implements TransferDriverInterface
                 }
             }
 
-            // rsync --info=progress2 uses \r between updates, \n at the end of summary lines
-            $parts = preg_split('/[\r\n]+/', $stdoutBuf);
-            $stdoutBuf = array_pop($parts);
-
-            foreach ($parts as $line) {
-                if (preg_match('/^\s*([\d,]+)\s+\d+%/', $line, $m)) {
-                    $bytesCopied = (int) str_replace(',', '', $m[1]);
-                    if (time() - $lastReport >= 5) {
-                        ($onProgress)($bytesCopied, $totalBytes);
-                        $lastReport = time();
-                    }
-                }
-            }
+            $parseProgress($stdoutBuf);
+            $parseProgress($stderrBuf);
         }
 
         @fclose($pipes[1]);
