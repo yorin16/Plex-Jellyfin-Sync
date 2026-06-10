@@ -124,6 +124,7 @@ class MediaConnectionController extends AbstractApiController
         if (isset($data['apiToken']))   $conn->setApiToken($data['apiToken']);
         if (isset($data['libraryId']))  $conn->setLibraryId($data['libraryId']);
         if (isset($data['libraryRoot'])) $conn->setLibraryRoot($data['libraryRoot']);
+        if (array_key_exists('localPath', $data)) $conn->setLocalPath($data['localPath'] ?: null);
         return $conn;
     }
 
@@ -137,6 +138,7 @@ class MediaConnectionController extends AbstractApiController
             'url'           => $c->getUrl(),
             'libraryId'     => $c->getLibraryId(),
             'libraryRoot'   => $c->getLibraryRoot(),
+            'localPath'     => $c->getLocalPath(),
             'lastScannedAt' => $c->getLastScannedAt()?->format(\DateTimeInterface::ATOM),
         ];
     }

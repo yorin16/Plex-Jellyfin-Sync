@@ -64,9 +64,9 @@ class TransferJobHandler
             throw new \RuntimeException('No transfer config for profile ' . $profile->getId());
         }
 
-        $libraryRoot = $sourceConn->getLibraryRoot() ?? '/var/media/source';
-        $relPath     = $sourceMedia->getPath() ?? '';
-        $sourceAbs   = rtrim($libraryRoot, '/') . '/' . ltrim($relPath, '/');
+        $localPath = $sourceConn->getLocalPath() ?? '/var/media/source';
+        $relPath   = $sourceMedia->getPath() ?? '';
+        $sourceAbs = rtrim($localPath, '/') . '/' . ltrim($relPath, '/');
 
         if (!is_dir($sourceAbs)) {
             throw new \RuntimeException("Source folder not found: {$sourceAbs}");

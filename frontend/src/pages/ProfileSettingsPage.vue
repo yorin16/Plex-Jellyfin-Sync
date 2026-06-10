@@ -155,8 +155,12 @@
           <input v-model="newConn.apiToken" placeholder="X-Plex-Token or Jellyfin API key" />
         </div>
         <div class="form-group">
-          <label>Library Root Path (on Docker host, e.g. /mnt/plex/movies)</label>
-          <input v-model="newConn.libraryRoot" placeholder="/var/media/source" />
+          <label>Library Root Path (what the media server reports, e.g. /movies)</label>
+          <input v-model="newConn.libraryRoot" placeholder="/movies" />
+        </div>
+        <div class="form-group">
+          <label>Local Path (inside Docker container, e.g. /var/media/source/films)</label>
+          <input v-model="newConn.localPath" placeholder="/var/media/source" />
         </div>
         <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px;">
           <button class="btn btn-ghost" @click="showAddConn = false">Cancel</button>
@@ -229,7 +233,7 @@ const libraryMap = reactive({})
 const showAddConn = ref(false)
 const showAddRule = ref(false)
 
-const newConn = reactive({ role: 'source', type: 'plex', url: '', apiToken: '', libraryRoot: '' })
+const newConn = reactive({ role: 'source', type: 'plex', url: '', apiToken: '', libraryRoot: '', localPath: '' })
 const newRule = reactive({ ruleType: 'codec', operator: 'equals', value: '', action: 'reject' })
 
 async function load() {
@@ -272,7 +276,7 @@ async function deleteConn(id) {
 }
 
 function openAddConn() {
-  Object.assign(newConn, { role: 'source', type: 'plex', url: '', apiToken: '', libraryRoot: '' })
+  Object.assign(newConn, { role: 'source', type: 'plex', url: '', apiToken: '', libraryRoot: '', localPath: '' })
   showAddConn.value = true
 }
 

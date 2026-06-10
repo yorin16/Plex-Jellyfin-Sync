@@ -44,6 +44,9 @@ class MediaConnection
     #[ORM\Column(length: 512, nullable: true)]
     private ?string $libraryRoot = null;
 
+    #[ORM\Column(length: 512, nullable: true)]
+    private ?string $localPath = null;
+
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $lastScannedAt = null;
 
@@ -70,6 +73,8 @@ class MediaConnection
     public function setLibraryId(?string $libraryId): static { $this->libraryId = $libraryId; return $this; }
     public function getLibraryRoot(): ?string { return $this->libraryRoot; }
     public function setLibraryRoot(?string $libraryRoot): static { $this->libraryRoot = $libraryRoot; return $this; }
+    public function getLocalPath(): ?string { return $this->localPath; }
+    public function setLocalPath(?string $localPath): static { $this->localPath = $localPath; return $this; }
     public function getLastScannedAt(): ?\DateTimeImmutable { return $this->lastScannedAt; }
     public function setLastScannedAt(?\DateTimeImmutable $lastScannedAt): static { $this->lastScannedAt = $lastScannedAt; return $this; }
 
