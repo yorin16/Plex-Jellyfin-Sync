@@ -40,7 +40,7 @@ class PlexClient
     public function getMovies(string $url, string $token, string $libraryId): array
     {
         $response = $this->httpClient->request('GET', rtrim($url, '/') . "/library/sections/{$libraryId}/all", [
-            'query' => ['type' => 1],
+            'query' => ['type' => 1, 'includeGuids' => 1],
             'headers' => ['X-Plex-Token' => $token, 'Accept' => 'application/json'],
         ]);
 
