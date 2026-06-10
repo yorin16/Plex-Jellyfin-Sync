@@ -17,6 +17,8 @@ class JellyfinScanner
 
     public function scan(MediaConnection $connection): int
     {
+        $scanStartedAt = new \DateTimeImmutable();
+
         $movies = $this->client->getMovies(
             $connection->getUrl(),
             $connection->getApiToken(),
@@ -56,6 +58,8 @@ class JellyfinScanner
         }
 
         $this->em->flush();
+
+        $this->cachedMediaRepository->deleteStaleByConnection($connection, $scanStartedAt);
 
         $connection->setLastScannedAt(new \DateTimeImmutable());
         $this->em->flush();

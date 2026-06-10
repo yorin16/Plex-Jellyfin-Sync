@@ -27,4 +27,16 @@ class CachedMediaRepository extends ServiceEntityRepository
     {
         return $this->findOneBy(['connection' => $connection, 'externalId' => $externalId]);
     }
+
+    public function deleteStaleByConnection(MediaConnection $connection, \DateTimeImmutable $since): int
+    {
+        return (int) $this->createQueryBuilder('m')
+            ->delete()
+            ->where('m.connection = :conn')
+            ->andWhere('m.lastSeenAt < :since')
+            ->setParameter('conn', $connection)
+            ->setParameter('since', $since)
+            ->getQuery()
+            ->execute();
+    }
 }
