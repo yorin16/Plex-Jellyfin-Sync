@@ -83,16 +83,18 @@ class TransferJobHandler
         $method   = $transferConf->getMethod();
         $config   = $transferConf->getConfig();
         $destBase = $config['dest_base_path'] ?? '';
-        $startTime = time();
-        $lastBytes = 0;
+        $lastCallTime = time();
+        $lastBytes    = 0;
 
-        $onProgress = function (int $bytesCopied, int $total) use ($job, &$startTime, &$lastBytes): void {
-            $elapsed = max(1, time() - $startTime);
-            $speed   = (int) (($bytesCopied - $lastBytes) / max(1, 5));
+        $onProgress = function (int $bytesCopied, int $total) use ($job, &$lastCallTime, &$lastBytes): void {
+            $now     = time();
+            $elapsed = max(1, $now - $lastCallTime);
+            $speed   = (int) (($bytesCopied - $lastBytes) / $elapsed);
             $job->setBytesCopied($bytesCopied);
             $job->setTotalBytes($total);
             $job->setTransferSpeedBps($speed);
-            $lastBytes = $bytesCopied;
+            $lastBytes    = $bytesCopied;
+            $lastCallTime = $now;
             $this->em->flush();
         };
 
