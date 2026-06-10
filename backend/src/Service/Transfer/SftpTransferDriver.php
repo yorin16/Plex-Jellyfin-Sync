@@ -81,13 +81,22 @@ class SftpTransferDriver implements TransferDriverInterface
             if ($item->isDir()) {
                 $sftp->mkdir($remote, -1, true);
             } else {
-                $sftp->put($remote, $item->getRealPath(), SFTP::SOURCE_LOCAL_FILE);
-                $bytesCopied += $item->getSize();
-
-                if (time() - $lastReport >= 5) {
-                    ($onProgress)($bytesCopied, $totalBytes);
-                    $lastReport = time();
-                }
+                $bytesBeforeFile = $bytesCopied;
+                $sftp->put(
+                    $remote,
+                    $item->getRealPath(),
+                    SFTP::SOURCE_LOCAL_FILE,
+                    -1,
+                    -1,
+                    function (int $sent) use ($bytesBeforeFile, $totalBytes, $onProgress, &$bytesCopied, &$lastReport): void {
+                        $bytesCopied = $bytesBeforeFile + $sent;
+                        if (time() - $lastReport >= 5) {
+                            ($onProgress)($bytesCopied, $totalBytes);
+                            $lastReport = time();
+                        }
+                    }
+                );
+                $bytesCopied = $bytesBeforeFile + $item->getSize();
             }
         }
 
