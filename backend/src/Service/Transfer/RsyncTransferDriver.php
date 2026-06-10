@@ -45,9 +45,7 @@ class RsyncTransferDriver implements TransferDriverInterface
 
         // -rlt: recursive, preserve symlinks and timestamps; skip -pog (owner/group/perms)
         // which fail when the destination user isn't root.
-        // --outbuf=U: force unbuffered output so progress lines are flushed immediately
-        // when stdout is a pipe (default is block-buffered, meaning output arrives all at once).
-        $cmd = 'rsync -rlt --outbuf=U --info=progress2 --no-inc-recursive'
+        $cmd = 'rsync -rlt --info=progress2 --no-inc-recursive'
             . ' -e ' . escapeshellarg('ssh ' . $sshArgs)
             . ' ' . escapeshellarg(rtrim($sourceAbsPath, '/') . '/')
             . ' ' . escapeshellarg($username . '@' . $host . ':' . $destPath . '/');
@@ -59,9 +57,12 @@ class RsyncTransferDriver implements TransferDriverInterface
         $totalBytes = $this->calculateSize($sourceAbsPath);
         $lastReport = 0; // fire first update immediately
 
+        // Use a PTY for stdout so rsync thinks it's writing to a terminal.
+        // Without a TTY, rsync uses block-buffered output and progress lines
+        // only arrive after the process exits. With a PTY it flushes immediately.
         $proc = proc_open($cmd, [
             0 => ['pipe', 'r'],
-            1 => ['pipe', 'r'],
+            1 => ['pty'],
             2 => ['pipe', 'r'],
         ], $pipes);
 
@@ -78,22 +79,6 @@ class RsyncTransferDriver implements TransferDriverInterface
         $stdoutDone = false;
         $stderrDone = false;
 
-        // rsync --info=progress2 writes to stderr on some versions, stdout on others.
-        // Parse both so progress is captured regardless.
-        $parseProgress = function (string &$buf) use ($totalBytes, &$lastReport, $onProgress): void {
-            $parts = preg_split('/[\r\n]+/', $buf);
-            $buf = (string) array_pop($parts);
-            foreach ($parts as $line) {
-                if (preg_match('/^\s*([\d,]+)\s+\d+%/', $line, $m)) {
-                    $bytesCopied = (int) str_replace(',', '', $m[1]);
-                    if (time() - $lastReport >= 2) {
-                        ($onProgress)($bytesCopied, $totalBytes);
-                        $lastReport = time();
-                    }
-                }
-            }
-        };
-
         while (!$stdoutDone || !$stderrDone) {
             $read = [];
             if (!$stdoutDone) $read[] = $pipes[1];
@@ -105,10 +90,13 @@ class RsyncTransferDriver implements TransferDriverInterface
             if ($n > 0) {
                 foreach ($read as $pipe) {
                     $chunk = @fread($pipe, 65536);
-                    if ($chunk === false || $chunk === '') {
+                    if ($chunk === false || ($chunk === '' && feof($pipe))) {
                         if ($pipe === $pipes[1]) $stdoutDone = true;
                         else $stderrDone = true;
                         continue;
+                    }
+                    if ($chunk === '') {
+                        continue; // no data yet, not EOF
                     }
                     if ($pipe === $pipes[1]) {
                         $stdoutBuf .= $chunk;
@@ -118,8 +106,18 @@ class RsyncTransferDriver implements TransferDriverInterface
                 }
             }
 
-            $parseProgress($stdoutBuf);
-            $parseProgress($stderrBuf);
+            // Parse progress from stdout only; keep stderrBuf intact for error reporting
+            $parts = preg_split('/[\r\n]+/', $stdoutBuf);
+            $stdoutBuf = (string) array_pop($parts);
+            foreach ($parts as $line) {
+                if (preg_match('/^\s*([\d,]+)\s+\d+%/', $line, $m)) {
+                    $bytesCopied = (int) str_replace(',', '', $m[1]);
+                    if (time() - $lastReport >= 2) {
+                        ($onProgress)($bytesCopied, $totalBytes);
+                        $lastReport = time();
+                    }
+                }
+            }
         }
 
         @fclose($pipes[1]);
