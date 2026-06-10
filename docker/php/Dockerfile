@@ -4,6 +4,9 @@ RUN apk add --no-cache \
     git \
     unzip \
     libzip-dev \
+    rsync \
+    openssh-client \
+    sshpass \
     && docker-php-ext-install \
         pdo \
         pdo_mysql \

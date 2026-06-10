@@ -6,7 +6,6 @@ use App\Entity\TransferJob;
 use App\Message\TransferJobMessage;
 use App\Repository\TransferJobRepository;
 use App\Service\Jellyfin\JellyfinClient;
-use App\Service\Transfer\SftpTransferDriver;
 use App\Service\Transfer\TransferDriverRegistry;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -95,9 +94,8 @@ class TransferJobHandler
             $this->em->flush();
         };
 
-        if ($method === 'sftp') {
-            /** @var SftpTransferDriver $driver */
-            $driver = $this->driverRegistry->get('sftp');
+        if ($method === 'sftp' || $method === 'rsync') {
+            $driver = $this->driverRegistry->get($method);
             $driver->transferFolderWithConfig($config, $sourceAbs, $relPath, $onProgress);
         } else {
             $driver = $this->driverRegistry->get($method);

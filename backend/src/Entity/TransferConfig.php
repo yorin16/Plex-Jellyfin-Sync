@@ -10,9 +10,10 @@ use Doctrine\ORM\Mapping as ORM;
 class TransferConfig
 {
     public const METHOD_LOCAL = 'local';
-    public const METHOD_SFTP = 'sftp';
-    public const METHOD_SMB = 'smb';
-    public const METHOD_FTP = 'ftp';
+    public const METHOD_SFTP  = 'sftp';
+    public const METHOD_RSYNC = 'rsync';
+    public const METHOD_SMB   = 'smb';
+    public const METHOD_FTP   = 'ftp';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]

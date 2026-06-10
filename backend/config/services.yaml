@@ -23,3 +23,4 @@ services:
         calls:
             - [register, ['@App\Service\Transfer\LocalTransferDriver']]
             - [register, ['@App\Service\Transfer\SftpTransferDriver']]
+            - [register, ['@App\Service\Transfer\RsyncTransferDriver']]

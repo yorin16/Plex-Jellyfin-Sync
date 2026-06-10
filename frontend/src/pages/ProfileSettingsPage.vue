@@ -52,11 +52,12 @@
         <div class="form-group">
           <label>Method</label>
           <select v-model="tc.method">
+            <option value="rsync">rsync over SSH (fastest)</option>
             <option value="sftp">SFTP</option>
             <option value="local">Local Filesystem</option>
           </select>
         </div>
-        <template v-if="tc.method === 'sftp'">
+        <template v-if="tc.method === 'sftp' || tc.method === 'rsync'">
           <div class="form-row">
             <div class="form-group">
               <label>Host</label>
