@@ -76,9 +76,19 @@
           <button
             class="btn btn-primary"
             :disabled="selectedIds.size === 0"
-            @click="queueSelected"
+            @click="queueSelected(null)"
           >
-            {{ selectedTranscodeProfileId ? '⚙ Transcode' : 'Queue' }} {{ selectedIds.size > 0 ? selectedIds.size : '' }} Selected
+            Queue {{ selectedIds.size > 0 ? selectedIds.size : '' }} Selected
+          </button>
+          <button
+            v-if="availableTranscodeProfiles.length > 0"
+            class="btn btn-primary"
+            style="background: #d97706;"
+            :disabled="selectedIds.size === 0 || !selectedTranscodeProfileId"
+            :title="!selectedTranscodeProfileId ? 'Select a transcode profile first' : ''"
+            @click="queueSelected(selectedTranscodeProfileId)"
+          >
+            ⚙ Transcode {{ selectedIds.size > 0 ? selectedIds.size : '' }} Selected
           </button>
         </div>
 
@@ -141,9 +151,19 @@
                       class="btn btn-primary"
                       style="font-size: 12px; padding: 4px 10px;"
                       :disabled="item.validation?.status === 'rejected' && !overriddenIds.has(item.id)"
-                      @click="queueOne(item.id)"
+                      @click="queueOne(item.id, null)"
                     >
-                      {{ selectedTranscodeProfileId ? '⚙ Transcode' : 'Queue' }}
+                      Queue
+                    </button>
+                    <button
+                      v-if="availableTranscodeProfiles.length > 0"
+                      class="btn btn-primary"
+                      style="font-size: 12px; padding: 4px 10px; background: #d97706;"
+                      :disabled="(item.validation?.status === 'rejected' && !overriddenIds.has(item.id)) || !selectedTranscodeProfileId"
+                      :title="!selectedTranscodeProfileId ? 'Select a transcode profile in the toolbar first' : ''"
+                      @click="queueOne(item.id, selectedTranscodeProfileId)"
+                    >
+                      ⚙ Transcode
                     </button>
                     <button
                       class="btn btn-ghost"
@@ -310,16 +330,16 @@ function toggleSelect(id) {
   selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id)
 }
 
-async function queueOne(id) {
-  await jobs.queue(profileId, [id], selectedTranscodeProfileId.value)
-  toast('Added to queue')
+async function queueOne(id, transcodeProfileId) {
+  await jobs.queue(profileId, [id], transcodeProfileId)
+  toast(transcodeProfileId ? 'Added to transcode queue' : 'Added to queue')
 }
 
-async function queueSelected() {
+async function queueSelected(transcodeProfileId) {
   const count = selectedIds.size
-  await jobs.queue(profileId, [...selectedIds], selectedTranscodeProfileId.value)
+  await jobs.queue(profileId, [...selectedIds], transcodeProfileId)
   selectedIds.clear()
-  toast(`${count} movie${count !== 1 ? 's' : ''} added to queue`)
+  toast(`${count} movie${count !== 1 ? 's' : ''} added to ${transcodeProfileId ? 'transcode' : 'transfer'} queue`)
 }
 
 async function ignore(id) {
