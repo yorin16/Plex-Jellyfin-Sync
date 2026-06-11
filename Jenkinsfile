@@ -2,9 +2,8 @@ pipeline {
     agent any
 
     environment {
-        PORTAINER_URL    = 'http://10.0.0.208:9001'
-        PORTAINER_ENDPOINT = '1'
-        STACK_NAME       = 'media-sync'  // match the stack name in Portainer exactly
+        PORTAINER_URL = 'http://10.0.0.208:9001'
+        STACK_NAME    = 'media-sync'  // match the stack name in Portainer exactly
     }
 
     stages {
@@ -22,8 +21,17 @@ pipeline {
                 withCredentials([string(credentialsId: 'portainer-api-token', variable: 'PORTAINER_TOKEN')]) {
                     timeout(time: 10, unit: 'MINUTES') {
                         sh '''
+                            # Auto-discover the first available endpoint ID
+                            ENDPOINT_ID=$(curl -sf -H "X-API-Key: $PORTAINER_TOKEN" \
+                                "${PORTAINER_URL}/api/endpoints" | grep -o '"Id":[0-9]*' | head -1 | grep -o '[0-9]*')
+                            if [ -z "$ENDPOINT_ID" ]; then
+                                echo "Failed to discover Portainer endpoint ID"
+                                exit 1
+                            fi
+                            echo "Using Portainer endpoint ID: $ENDPOINT_ID"
+
                             FILTER="%7B%22label%22%3A%5B%22com.docker.compose.project%3D${STACK_NAME}%22%5D%7D"
-                            URL="${PORTAINER_URL}/api/endpoints/${PORTAINER_ENDPOINT}/docker/containers/json?all=1&filters=${FILTER}"
+                            URL="${PORTAINER_URL}/api/endpoints/${ENDPOINT_ID}/docker/containers/json?all=1&filters=${FILTER}"
                             TIMEOUT=600
                             ELAPSED=0
                             INTERVAL=10
