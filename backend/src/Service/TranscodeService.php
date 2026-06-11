@@ -92,7 +92,8 @@ class TranscodeService
         $args    = ['ffmpeg'];
 
         if ($isQsv) {
-            array_push($args, '-hwaccel', 'qsv', '-hwaccel_output_format', 'qsv');
+            // Explicit device helps libmfx find the right DRI node
+            array_push($args, '-hwaccel', 'qsv', '-qsv_device', '/dev/dri/renderD128', '-hwaccel_output_format', 'qsv');
         } elseif ($isVaapi) {
             array_push($args, '-hwaccel', 'vaapi', '-hwaccel_device', '/dev/dri/renderD128', '-hwaccel_output_format', 'vaapi');
         }
@@ -126,8 +127,7 @@ class TranscodeService
             '-profile:v', 'main',
         );
 
-        // Audio: copy everything, then override lossless streams
-        array_push($args, '-c:a', 'copy');
+        // Audio: explicit per-stream codec to avoid "multiple -c options" warning in FFmpeg 5.x
         foreach ($audioStreams as $idx => $stream) {
             if ($this->isLosslessAudio($stream)) {
                 array_push(
@@ -135,7 +135,13 @@ class TranscodeService
                     '-c:a:' . $idx, $profile->getLosslessAudioCodec(),
                     '-b:a:' . $idx, $profile->getLosslessAudioBitrateKbps() . 'k',
                 );
+            } else {
+                array_push($args, '-c:a:' . $idx, 'copy');
             }
+        }
+        // Fallback for any streams ffprobe missed (e.g. commentary tracks added after probe)
+        if (empty($audioStreams)) {
+            array_push($args, '-c:a', 'copy');
         }
 
         array_push($args, '-c:s', 'copy', '-progress', 'pipe:1', '-y', $outputPath);
