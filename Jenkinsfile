@@ -21,50 +21,36 @@ pipeline {
             steps {
                 withCredentials([string(credentialsId: 'portainer-api-token', variable: 'PORTAINER_TOKEN')]) {
                     timeout(time: 10, unit: 'MINUTES') {
-                        sh '''python3 << 'PYEOF'
-import json, urllib.request, urllib.parse, os, sys, time
+                        sh '''
+                            FILTER="%7B%22label%22%3A%5B%22com.docker.compose.project%3D${STACK_NAME}%22%5D%7D"
+                            URL="${PORTAINER_URL}/api/endpoints/${PORTAINER_ENDPOINT}/docker/containers/json?all=1&filters=${FILTER}"
+                            TIMEOUT=600
+                            ELAPSED=0
+                            INTERVAL=10
 
-portainer_url = os.environ["PORTAINER_URL"]
-endpoint      = os.environ["PORTAINER_ENDPOINT"]
-stack_name    = os.environ["STACK_NAME"]
-token         = os.environ["PORTAINER_TOKEN"]
+                            echo "Polling Portainer for stack: $STACK_NAME"
+                            sleep 8
 
-filters = json.dumps({"label": ["com.docker.compose.project=" + stack_name]})
-url = (portainer_url + "/api/endpoints/" + endpoint
-       + "/docker/containers/json?all=1&filters=" + urllib.parse.quote(filters))
-headers = {"X-API-Key": token}
+                            while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
+                                RESULT=$(curl -sf -H "X-API-Key: $PORTAINER_TOKEN" "$URL")
+                                if [ -z "$RESULT" ] || [ "$RESULT" = "null" ]; then
+                                    echo "[${ELAPSED}s] Could not reach Portainer API"
+                                else
+                                    TOTAL=$(echo "$RESULT" | grep -o '"State":"[^"]*"' | wc -l | tr -d ' ')
+                                    RUNNING=$(echo "$RESULT" | grep -o '"State":"running"' | wc -l | tr -d ' ')
+                                    echo "[${ELAPSED}s] ${RUNNING}/${TOTAL} running"
+                                    if [ "$TOTAL" -gt 0 ] && [ "$RUNNING" -eq "$TOTAL" ]; then
+                                        echo "All containers are running."
+                                        exit 0
+                                    fi
+                                fi
+                                sleep "$INTERVAL"
+                                ELAPSED=$((ELAPSED + INTERVAL))
+                            done
 
-print("Polling Portainer for stack: " + stack_name, flush=True)
-time.sleep(8)  # give Portainer a moment to start pulling
-
-timeout  = 600
-elapsed  = 0
-interval = 10
-
-while elapsed < timeout:
-    try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            containers = json.loads(resp.read())
-        total   = len(containers)
-        running = sum(1 for c in containers if c.get("State") == "running")
-        states  = ", ".join(
-            (c.get("Names", ["?"])[0].lstrip("/") + " [" + c.get("State", "?") + "]")
-            for c in containers
-        )
-        print("[{}s] {}/{} running — {}".format(elapsed, running, total, states), flush=True)
-        if total > 0 and running == total:
-            print("All containers are running.", flush=True)
-            sys.exit(0)
-    except Exception as e:
-        print("[{}s] API error: {}".format(elapsed, e), flush=True)
-    time.sleep(interval)
-    elapsed += interval
-
-print("Timed out waiting for containers to start.", flush=True)
-sys.exit(1)
-PYEOF
-'''
+                            echo "Timed out waiting for containers to start."
+                            exit 1
+                        '''
                     }
                 }
             }
