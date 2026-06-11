@@ -2,9 +2,9 @@ pipeline {
     agent any
 
     environment {
-        PORTAINER_URL    = 'http://10.0.0.208:9000'
+        PORTAINER_URL    = 'http://10.0.0.208:9001'
         PORTAINER_ENDPOINT = '1'
-        STACK_NAME       = 'plex-jellyfin-sync'  // match the stack name in Portainer exactly
+        STACK_NAME       = 'media-sync'  // match the stack name in Portainer exactly
     }
 
     stages {
