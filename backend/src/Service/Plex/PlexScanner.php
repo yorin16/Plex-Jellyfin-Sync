@@ -86,12 +86,30 @@ class PlexScanner
 
     private function resolveResolution(array $media): ?string
     {
+        // Prefer Plex's own videoResolution field — height can be slightly below
+        // nominal (e.g. 1038 for 1080p) due to aspect-ratio cropping, causing
+        // height-based thresholds to misclassify the resolution.
+        $raw = $media['videoResolution'] ?? null;
+        if ($raw !== null) {
+            if (is_numeric($raw)) {
+                $r = (int) $raw;
+                if ($r >= 2160) return '2160p';
+                if ($r >= 1080) return '1080p';
+                if ($r >= 720) return '720p';
+                if ($r >= 480) return '480p';
+            }
+            if (strtolower($raw) === '4k') return '2160p';
+            return $raw;
+        }
+
+        // Use generous thresholds: 1080p content with aspect-ratio cropping
+        // can have heights as low as ~1036; 720p tops out at 720.
         $h = (int) ($media['height'] ?? 0);
-        if ($h >= 2160) return '2160p';
-        if ($h >= 1080) return '1080p';
-        if ($h >= 720) return '720p';
-        if ($h >= 480) return '480p';
-        return $media['videoResolution'] ?? null;
+        if ($h >= 2000) return '2160p';
+        if ($h >= 1000) return '1080p';
+        if ($h >= 600) return '720p';
+        if ($h >= 400) return '480p';
+        return null;
     }
 
     private function extractHdrType(array $streams): ?string
