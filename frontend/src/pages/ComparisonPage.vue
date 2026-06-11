@@ -14,6 +14,21 @@
 
     <div v-if="error" style="color: #f87171; margin-bottom: 20px;">{{ error }}</div>
 
+    <!-- Disk usage -->
+    <div v-if="diskUsage" class="disk-usage-bar">
+      <div class="disk-usage-info">
+        <span>Destination</span>
+        <span>{{ formatBytes(diskUsage.used) }} used of {{ formatBytes(diskUsage.total) }}</span>
+        <span style="color: #64748b;">{{ formatBytes(diskUsage.free) }} free</span>
+      </div>
+      <div class="disk-bar">
+        <div class="disk-bar-fill" :style="{ width: Math.round(diskUsage.used / diskUsage.total * 100) + '%', background: diskUsage.used / diskUsage.total > 0.9 ? '#f87171' : diskUsage.used / diskUsage.total > 0.75 ? '#fbbf24' : '#7c6af7' }"></div>
+      </div>
+    </div>
+    <div v-else-if="diskUsageError" style="font-size: 12px; color: #f87171; margin-bottom: 16px;">
+      Disk usage unavailable: {{ diskUsageError }}
+    </div>
+
     <!-- Tabs -->
     <div class="tabs">
       <button
@@ -182,7 +197,7 @@
 <script setup>
 import { ref, computed, reactive, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { comparison, jobs, overrides } from '@/api'
+import { comparison, jobs, overrides, transferConfig } from '@/api'
 import { useToast } from '@/composables/useToast'
 
 const route = useRoute()
@@ -191,6 +206,8 @@ const profileId = Number(route.params.id)
 const { show: toast } = useToast()
 const loading = ref(false)
 const error = ref(null)
+const diskUsage = ref(null)
+const diskUsageError = ref(null)
 const onlyInSource = ref([])
 const onlyInDest = ref([])
 const potentialMatches = ref([])
@@ -280,7 +297,20 @@ function formatBytes(bytes) {
   return (bytes / 1e6).toFixed(1) + ' MB'
 }
 
-onMounted(load)
+async function loadDiskUsage() {
+  diskUsageError.value = null
+  try {
+    diskUsage.value = await transferConfig.diskUsage(profileId)
+  } catch (e) {
+    diskUsageError.value = e.response?.data?.error ?? e.message
+    diskUsage.value = null
+  }
+}
+
+onMounted(() => {
+  load()
+  loadDiskUsage()
+})
 </script>
 
 <style scoped>
@@ -306,6 +336,11 @@ onMounted(load)
 }
 
 .toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+.disk-usage-bar { margin-bottom: 20px; }
+.disk-usage-info { display: flex; gap: 16px; font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
+.disk-usage-info span:first-child { color: #e2e8f0; font-weight: 500; }
+.disk-bar { height: 6px; background: #2d3148; border-radius: 3px; overflow: hidden; }
+.disk-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
 
 .empty-card { text-align: center; color: #64748b; padding: 40px; }
 
