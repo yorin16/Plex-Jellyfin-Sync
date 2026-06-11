@@ -146,7 +146,7 @@ class TranscodeService
 
         array_push($args, '-c:s', 'copy', '-progress', 'pipe:1', '-y', $outputPath);
 
-        $this->runProcess($args, $estimatedBytes, $onProgress);
+        $this->runProcess($args, $duration, $estimatedBytes, $onProgress);
     }
 
     public function copyNonVideoFiles(string $sourceFolder, string $destFolder, string $videoFilename): void
@@ -197,7 +197,7 @@ class TranscodeService
         rmdir($path);
     }
 
-    private function runProcess(array $args, int $estimatedBytes, callable $onProgress): void
+    private function runProcess(array $args, float $duration, int $estimatedBytes, callable $onProgress): void
     {
         $cmd        = implode(' ', array_map('escapeshellarg', $args));
         $stderrFile = tempnam(sys_get_temp_dir(), 'ffmpeg_err_');
@@ -219,7 +219,7 @@ class TranscodeService
         $progressBuf = '';
         $stdoutDone  = false;
         $lastReport  = 0;
-        $bytesDone   = 0;
+        $durationUs  = $duration > 0 ? (int) ($duration * 1_000_000) : 0;
 
         while (!$stdoutDone) {
             $read = [$pipes[1]];
@@ -237,19 +237,24 @@ class TranscodeService
                 }
             }
 
-            // Parse -progress pipe:1 key=value lines
+            // Parse -progress pipe:1 key=value lines; use out_time_us for reliable
+            // time-based progress (total_size stays 0 with VA-API / MKV muxer)
             $lines       = explode("\n", $progressBuf);
             $progressBuf = (string) array_pop($lines);
+            $outTimeUs   = null;
             foreach ($lines as $line) {
                 $line = trim($line);
-                if (str_starts_with($line, 'total_size=')) {
-                    $bytesDone = (int) substr($line, 11);
+                if (str_starts_with($line, 'out_time_us=')) {
+                    $outTimeUs = (int) substr($line, 12);
                 }
             }
 
-            if (time() - $lastReport >= 5 && $bytesDone > 0) {
-                ($onProgress)($bytesDone, max($bytesDone, $estimatedBytes));
-                $lastReport = time();
+            if ($outTimeUs !== null && $outTimeUs > 0 && $durationUs > 0) {
+                $bytesDone = (int) min($outTimeUs / $durationUs * $estimatedBytes, $estimatedBytes);
+                if (time() - $lastReport >= 5) {
+                    ($onProgress)($bytesDone, $estimatedBytes);
+                    $lastReport = time();
+                }
             }
         }
 
