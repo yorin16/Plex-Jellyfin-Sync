@@ -8,6 +8,7 @@ RUN apk add --no-cache \
     openssh-client \
     sshpass \
     ffmpeg \
+    libva \
     intel-media-driver \
     && docker-php-ext-install \
         pdo \

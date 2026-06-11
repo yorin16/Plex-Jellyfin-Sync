@@ -87,14 +87,27 @@ class TranscodeService
             ? (int) (($videoBitrate + $profile->getLosslessAudioBitrateKbps()) * 1000 / 8 * $duration)
             : PHP_INT_MAX;
 
-        $args = ['ffmpeg', '-hwaccel', 'qsv', '-hwaccel_output_format', 'qsv', '-i', $inputPath, '-map', '0'];
+        $isQsv = str_ends_with($profile->getVideoCodec(), '_qsv');
+        $args  = ['ffmpeg'];
+
+        if ($isQsv) {
+            array_push($args, '-hwaccel', 'qsv', '-hwaccel_output_format', 'qsv');
+        }
+
+        array_push($args, '-i', $inputPath, '-map', '0');
 
         // Video filter (scale + optional HDR→SDR tone-mapping)
         if ($profile->getMaxHeight() !== null) {
-            $h  = $profile->getMaxHeight();
-            $vf = $profile->isHdrToSdr()
-                ? "vpp_qsv=tonemap=1:w=-2:h={$h}"
-                : "scale_qsv=-2:{$h}";
+            $h = $profile->getMaxHeight();
+            if ($isQsv) {
+                $vf = $profile->isHdrToSdr()
+                    ? "vpp_qsv=tonemap=1:w=-2:h={$h}"
+                    : "scale_qsv=-2:{$h}";
+            } else {
+                $vf = $profile->isHdrToSdr()
+                    ? "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,scale=-2:{$h}"
+                    : "scale=-2:{$h}";
+            }
             array_push($args, '-vf', $vf);
         }
 
@@ -174,57 +187,41 @@ class TranscodeService
 
     private function runProcess(array $args, int $estimatedBytes, callable $onProgress): void
     {
-        $cmd  = implode(' ', array_map('escapeshellarg', $args));
+        $cmd        = implode(' ', array_map('escapeshellarg', $args));
+        $stderrFile = tempnam(sys_get_temp_dir(), 'ffmpeg_err_');
+
         $proc = proc_open($cmd, [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'r'],
-            2 => ['pipe', 'r'],
+            2 => ['file', $stderrFile, 'w'],
         ], $pipes);
 
         if (!is_resource($proc)) {
-            throw new \RuntimeException('Failed to start ffmpeg process');
+            @unlink($stderrFile);
+            throw new \RuntimeException('Failed to start ffmpeg process. Command: ' . $cmd);
         }
 
         fclose($pipes[0]);
         stream_set_blocking($pipes[1], false);
-        stream_set_blocking($pipes[2], false);
 
         $progressBuf = '';
-        $stderrBuf   = '';
         $stdoutDone  = false;
-        $stderrDone  = false;
         $lastReport  = 0;
         $bytesDone   = 0;
 
-        while (!$stdoutDone || !$stderrDone) {
-            $read = [];
-            if (!$stdoutDone) {
-                $read[] = $pipes[1];
-            }
-            if (!$stderrDone) {
-                $read[] = $pipes[2];
-            }
-
+        while (!$stdoutDone) {
+            $read = [$pipes[1]];
             $write = $except = null;
             @stream_select($read, $write, $except, 0, 200000);
 
             foreach ($read as $pipe) {
                 $chunk = @fread($pipe, 65536);
                 if ($chunk === false || ($chunk === '' && feof($pipe))) {
-                    if ($pipe === $pipes[1]) {
-                        $stdoutDone = true;
-                    } else {
-                        $stderrDone = true;
-                    }
+                    $stdoutDone = true;
                     continue;
                 }
-                if ($chunk === '') {
-                    continue;
-                }
-                if ($pipe === $pipes[1]) {
+                if ($chunk !== '') {
                     $progressBuf .= $chunk;
-                } else {
-                    $stderrBuf .= $chunk;
                 }
             }
 
@@ -245,11 +242,15 @@ class TranscodeService
         }
 
         @fclose($pipes[1]);
-        @fclose($pipes[2]);
-        $exitCode = proc_close($proc);
+        $exitCode  = proc_close($proc);
+        $stderrBuf = is_file($stderrFile) ? trim((string) file_get_contents($stderrFile)) : '';
+        @unlink($stderrFile);
 
         if ($exitCode !== 0) {
-            throw new \RuntimeException('ffmpeg failed (exit ' . $exitCode . '): ' . trim($stderrBuf));
+            throw new \RuntimeException(
+                'ffmpeg failed (exit ' . $exitCode . '): ' . $stderrBuf
+                . "\nCommand: " . $cmd
+            );
         }
 
         ($onProgress)($estimatedBytes, $estimatedBytes);
