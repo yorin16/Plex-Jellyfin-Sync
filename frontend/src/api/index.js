@@ -43,8 +43,9 @@ export const jobs = {
     const params = statuses ? { status: statuses.join(',') } : {}
     return api.get(`/profiles/${profileId}/jobs`, { params }).then(r => r.data)
   },
-  queue: (profileId, mediaIds) => api.post(`/profiles/${profileId}/jobs`, { mediaIds }).then(r => r.data),
-  cancel: (id)                 => api.delete(`/jobs/${id}`).then(r => r.data),
+  queue: (profileId, mediaIds)  => api.post(`/profiles/${profileId}/jobs`, { mediaIds }).then(r => r.data),
+  cancel: (id)                  => api.delete(`/jobs/${id}`).then(r => r.data),
+  clearFinished: (profileId)    => api.delete(`/profiles/${profileId}/jobs/finished`).then(r => r.data),
 }
 
 export const transferConfig = {

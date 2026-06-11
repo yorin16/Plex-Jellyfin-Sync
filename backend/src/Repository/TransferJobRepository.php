@@ -25,9 +25,21 @@ class TransferJobRepository extends ServiceEntityRepository
             ->andWhere('j.status IN (:statuses)')
             ->setParameter('profile', $profile)
             ->setParameter('statuses', $statuses)
-            ->orderBy('j.queuedAt', 'ASC')
+            ->orderBy('j.queuedAt', 'DESC')
             ->getQuery()
             ->getResult();
+    }
+
+    public function deleteFinishedByProfile(Profile $profile): int
+    {
+        return $this->createQueryBuilder('j')
+            ->delete()
+            ->where('j.profile = :profile')
+            ->andWhere('j.status IN (:statuses)')
+            ->setParameter('profile', $profile)
+            ->setParameter('statuses', [TransferJob::STATUS_COMPLETED, TransferJob::STATUS_FAILED, TransferJob::STATUS_CANCELLED])
+            ->getQuery()
+            ->execute();
     }
 
     public function getDashboardCounts(): array

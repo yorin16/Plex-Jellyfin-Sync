@@ -77,6 +77,18 @@ class TransferJobController extends AbstractApiController
         return $this->json($created, 201);
     }
 
+    #[Route('/profiles/{id}/jobs/finished', methods: ['DELETE'])]
+    public function clearFinished(int $id): JsonResponse
+    {
+        $profile = $this->profileRepo->find($id);
+        if (!$profile) {
+            return $this->notFound();
+        }
+
+        $deleted = $this->jobRepo->deleteFinishedByProfile($profile);
+        return $this->json(['deleted' => $deleted]);
+    }
+
     #[Route('/jobs/{id}', methods: ['DELETE'])]
     public function cancel(int $id): JsonResponse
     {

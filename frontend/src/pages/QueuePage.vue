@@ -6,6 +6,7 @@
       <div style="margin-left: auto; display: flex; gap: 8px;">
         <router-link :to="`/profiles/${profileId}/compare`" class="btn btn-ghost">Compare</router-link>
         <button class="btn btn-ghost" @click="load">↺ Refresh</button>
+        <button class="btn btn-danger" style="font-size: 13px;" @click="clearFinished">Clear finished</button>
       </div>
     </div>
 
@@ -135,6 +136,11 @@ async function cancel(id) {
   const updated = await jobs.cancel(id)
   const idx = allJobs.value.findIndex(j => j.id === id)
   if (idx !== -1) allJobs.value[idx] = updated
+}
+
+async function clearFinished() {
+  await jobs.clearFinished(profileId)
+  await load()
 }
 
 function statusBadge(s) {
