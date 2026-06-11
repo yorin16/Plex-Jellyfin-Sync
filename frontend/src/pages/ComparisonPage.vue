@@ -55,6 +55,16 @@
           <span v-if="selectedIds.size > 0" style="color: #94a3b8; font-size: 13px;">
             {{ formatBytes(selectedSize) }}
           </span>
+          <select
+            v-if="availableTranscodeProfiles.length > 0"
+            class="transcode-select"
+            v-model="selectedTranscodeProfileId"
+          >
+            <option :value="null">Direct transfer</option>
+            <option v-for="p in availableTranscodeProfiles" :key="p.id" :value="p.id">
+              ⚙ {{ p.name }}
+            </option>
+          </select>
           <button
             class="btn btn-primary"
             :disabled="selectedIds.size === 0"
@@ -197,7 +207,7 @@
 <script setup>
 import { ref, computed, reactive, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { comparison, jobs, overrides, transferConfig } from '@/api'
+import { comparison, jobs, overrides, transferConfig, transcodeProfiles } from '@/api'
 import { useToast } from '@/composables/useToast'
 
 const route = useRoute()
@@ -208,6 +218,8 @@ const loading = ref(false)
 const error = ref(null)
 const diskUsage = ref(null)
 const diskUsageError = ref(null)
+const availableTranscodeProfiles = ref([])
+const selectedTranscodeProfileId = ref(null)
 const onlyInSource = ref([])
 const onlyInDest = ref([])
 const potentialMatches = ref([])
@@ -291,13 +303,13 @@ function toggleSelect(id) {
 }
 
 async function queueOne(id) {
-  await jobs.queue(profileId, [id])
+  await jobs.queue(profileId, [id], selectedTranscodeProfileId.value)
   toast('Added to queue')
 }
 
 async function queueSelected() {
   const count = selectedIds.size
-  await jobs.queue(profileId, [...selectedIds])
+  await jobs.queue(profileId, [...selectedIds], selectedTranscodeProfileId.value)
   selectedIds.clear()
   toast(`${count} movie${count !== 1 ? 's' : ''} added to queue`)
 }
@@ -337,6 +349,7 @@ async function loadDiskUsage() {
 onMounted(() => {
   load()
   loadDiskUsage()
+  transcodeProfiles.list().then(p => { availableTranscodeProfiles.value = p })
 })
 </script>
 
@@ -362,7 +375,12 @@ onMounted(() => {
   font-size: 11px;
 }
 
-.toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+.toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+.transcode-select {
+  background: #13142a; border: 1px solid #2d3148; border-radius: 6px;
+  color: #e2e8f0; padding: 6px 10px; font-size: 13px; cursor: pointer;
+}
+.transcode-select:focus { outline: none; border-color: #7c6af7; }
 .sortable { cursor: pointer; user-select: none; white-space: nowrap; }
 .sortable:hover { color: #e2e8f0; }
 .sort-icon { color: #64748b; font-size: 11px; }

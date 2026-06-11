@@ -12,7 +12,17 @@ framework:
                     max_retries: 3
                     delay: 1000
                     multiplier: 2
+            transcode:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    use_notify: true
+                    check_delayed_interval: 1000
+                    queue_name: transcode
+                retry_strategy:
+                    max_retries: 1
+                    delay: 5000
             failed: 'doctrine://default?queue_name=failed'
 
         routing:
-            'App\Message\TransferJobMessage': async
+            'App\Message\TransferJobMessage':  async
+            'App\Message\TranscodeJobMessage': transcode

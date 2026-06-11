@@ -7,6 +7,8 @@ RUN apk add --no-cache \
     rsync \
     openssh-client \
     sshpass \
+    ffmpeg \
+    intel-media-driver \
     && docker-php-ext-install \
         pdo \
         pdo_mysql \

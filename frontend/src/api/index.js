@@ -43,7 +43,8 @@ export const jobs = {
     const params = statuses ? { status: statuses.join(',') } : {}
     return api.get(`/profiles/${profileId}/jobs`, { params }).then(r => r.data)
   },
-  queue: (profileId, mediaIds)  => api.post(`/profiles/${profileId}/jobs`, { mediaIds }).then(r => r.data),
+  queue: (profileId, mediaIds, transcodeProfileId = null) =>
+    api.post(`/profiles/${profileId}/jobs`, { mediaIds, transcodeProfileId }).then(r => r.data),
   cancel: (id)                  => api.delete(`/jobs/${id}`).then(r => r.data),
   clearFinished: (profileId)    => api.delete(`/profiles/${profileId}/jobs/finished`).then(r => r.data),
 }
@@ -62,4 +63,17 @@ export const validationRules = {
 
 export const dashboard = {
   get: () => api.get('/dashboard').then(r => r.data),
+}
+
+export const transcodeProfiles = {
+  list:   ()         => api.get('/transcode-profiles').then(r => r.data),
+  create: (data)     => api.post('/transcode-profiles', data).then(r => r.data),
+  update: (id, data) => api.put(`/transcode-profiles/${id}`, data).then(r => r.data),
+  remove: (id)       => api.delete(`/transcode-profiles/${id}`),
+}
+
+export const transcodeJobs = {
+  list:         (profileId) => api.get(`/profiles/${profileId}/transcode-jobs`).then(r => r.data),
+  cancel:       (id)        => api.delete(`/transcode-jobs/${id}`).then(r => r.data),
+  clearFinished:(profileId) => api.delete(`/profiles/${profileId}/transcode-jobs/finished`).then(r => r.data),
 }

@@ -23,6 +23,10 @@ const router = createRouter({
       path: '/profiles/:id/queue',
       component: () => import('@/pages/QueuePage.vue'),
     },
+    {
+      path: '/transcode-profiles',
+      component: () => import('@/pages/TranscodeProfilesPage.vue'),
+    },
   ],
 })
 

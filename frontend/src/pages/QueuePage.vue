@@ -39,11 +39,78 @@
       </button>
     </div>
 
-    <div v-if="filteredJobs.length === 0" class="card" style="text-align: center; color: #64748b; padding: 40px;">
+    <!-- Transcoding tab content -->
+    <template v-if="activeStatus === 'transcoding'">
+      <div v-if="allTranscodeJobs.length === 0" class="card" style="text-align: center; color: #64748b; padding: 40px;">
+        No transcoding jobs.
+      </div>
+      <div v-else class="card" style="padding: 0;">
+        <table>
+          <thead>
+            <tr>
+              <th>Movie</th>
+              <th>Profile</th>
+              <th>Progress</th>
+              <th>Status</th>
+              <th>Queued</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="job in allTranscodeJobs" :key="job.id">
+              <td>
+                <div style="font-weight: 500;">{{ job.sourceMedia.title }}</div>
+                <div style="font-size: 12px; color: #64748b;">
+                  {{ job.sourceMedia.year }} · {{ job.sourceMedia.codec }} · {{ job.sourceMedia.resolution }}
+                </div>
+              </td>
+              <td style="font-size: 12px; color: #94a3b8;">{{ job.transcodeProfile.name }}</td>
+              <td style="min-width: 200px;">
+                <template v-if="job.status === 'running' || job.status === 'completed'">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="progress-bar" style="flex: 1;">
+                      <div class="progress-bar-fill" :style="{ width: job.progressPercent + '%', background: '#f59e0b' }"></div>
+                    </div>
+                    <span style="font-size: 12px; color: #94a3b8; min-width: 42px;">{{ job.progressPercent }}%</span>
+                  </div>
+                  <div style="font-size: 11px; color: #64748b; margin-top: 3px;">
+                    {{ formatBytes(job.bytesDone) }} / {{ formatBytes(job.totalBytes) }}
+                  </div>
+                </template>
+                <span v-else style="color: #64748b; font-size: 12px;">—</span>
+              </td>
+              <td>
+                <span class="badge" :class="statusBadge(job.status)">{{ job.status }}</span>
+              </td>
+              <td style="font-size: 12px; color: #64748b; white-space: nowrap;">
+                {{ formatDate(job.queuedAt) }}
+              </td>
+              <td>
+                <div style="display: flex; gap: 6px;">
+                  <button
+                    v-if="job.status === 'queued'"
+                    class="btn btn-danger"
+                    style="font-size: 12px; padding: 4px 10px;"
+                    @click="cancelTranscode(job.id)"
+                  >
+                    Cancel
+                  </button>
+                  <span v-if="job.status === 'failed'" class="error-msg" :title="job.errorMessage">
+                    {{ (job.errorMessage ?? '').substring(0, 40) }}{{ (job.errorMessage ?? '').length > 40 ? '…' : '' }}
+                  </span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
+
+    <div v-if="activeStatus !== 'transcoding' && filteredJobs.length === 0" class="card" style="text-align: center; color: #64748b; padding: 40px;">
       No {{ activeStatus }} transfers.
     </div>
 
-    <div v-else class="card" style="padding: 0;">
+    <div v-if="activeStatus !== 'transcoding' && filteredJobs.length > 0" class="card" style="padding: 0;">
       <table>
         <thead>
           <tr>
@@ -112,27 +179,32 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { jobs, transferConfig } from '@/api'
+import { jobs, transferConfig, transcodeJobs } from '@/api'
 
 const route = useRoute()
 const profileId = Number(route.params.id)
 
 const allJobs = ref([])
-const activeStatus = ref('all')
+const allTranscodeJobs = ref([])
+const activeStatus = ref('transcoding')
 const diskUsage = ref(null)
 const diskUsageError = ref(null)
 let interval = null
 
 const statusFilters = [
-  { value: 'all',       label: 'All' },
-  { value: 'queued',    label: 'Queued' },
-  { value: 'running',   label: 'Running' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'failed',    label: 'Failed' },
+  { value: 'transcoding', label: 'Transcoding' },
+  { value: 'all',         label: 'All' },
+  { value: 'queued',      label: 'Queued' },
+  { value: 'running',     label: 'Running' },
+  { value: 'completed',   label: 'Completed' },
+  { value: 'failed',      label: 'Failed' },
 ]
 
 const countByStatus = computed(() => {
-  const c = { all: allJobs.value.length }
+  const c = {
+    all:         allJobs.value.length,
+    transcoding: allTranscodeJobs.value.length,
+  }
   for (const j of allJobs.value) {
     c[j.status] = (c[j.status] ?? 0) + 1
   }
@@ -146,7 +218,10 @@ const filteredJobs = computed(() =>
 )
 
 async function load() {
-  allJobs.value = await jobs.list(profileId).catch(() => [])
+  ;[allJobs.value, allTranscodeJobs.value] = await Promise.all([
+    jobs.list(profileId).catch(() => []),
+    transcodeJobs.list(profileId).catch(() => []),
+  ])
 }
 
 async function loadDiskUsage() {
@@ -166,8 +241,17 @@ async function cancel(id) {
 }
 
 async function clearFinished() {
-  await jobs.clearFinished(profileId)
+  await Promise.all([
+    jobs.clearFinished(profileId),
+    transcodeJobs.clearFinished(profileId),
+  ])
   await load()
+}
+
+async function cancelTranscode(id) {
+  const updated = await transcodeJobs.cancel(id)
+  const idx = allTranscodeJobs.value.findIndex(j => j.id === id)
+  if (idx !== -1) allTranscodeJobs.value[idx] = updated
 }
 
 function statusBadge(s) {

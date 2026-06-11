@@ -7,6 +7,7 @@ use App\Message\TransferJobMessage;
 use App\Repository\TransferJobRepository;
 use App\Service\Jellyfin\JellyfinClient;
 use App\Service\Jellyfin\JellyfinScanner;
+use App\Service\TranscodeService;
 use App\Service\Transfer\TransferDriverRegistry;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -20,6 +21,7 @@ class TransferJobHandler
         private readonly TransferDriverRegistry $driverRegistry,
         private readonly JellyfinClient $jellyfinClient,
         private readonly JellyfinScanner $jellyfinScanner,
+        private readonly TranscodeService $transcodeService,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
     ) {}
@@ -40,6 +42,7 @@ class TransferJobHandler
             $this->execute($job);
             $job->setStatus(TransferJob::STATUS_COMPLETED);
             $job->setCompletedAt(new \DateTimeImmutable());
+            $this->cleanupTempDir($job);
             $this->triggerJellyfinRefresh($job);
         } catch (\Throwable $e) {
             $this->logger->error('Transfer job {id} failed: {msg}', [
@@ -67,7 +70,8 @@ class TransferJobHandler
 
         $localPath = $sourceConn->getLocalPath() ?? '/var/media/source';
         $relPath   = $sourceMedia->getPath() ?? '';
-        $sourceAbs = rtrim($localPath, '/') . '/' . ltrim($relPath, '/');
+        $sourceAbs = $job->getSourceDirOverride()
+            ?? rtrim($localPath, '/') . '/' . ltrim($relPath, '/');
 
         if (!is_dir($sourceAbs)) {
             throw new \RuntimeException("Source folder not found: {$sourceAbs}");
@@ -104,6 +108,14 @@ class TransferJobHandler
         } else {
             $driver = $this->driverRegistry->get($method);
             $driver->transferFolder($sourceAbs, $destBase, $relPath, $onProgress);
+        }
+    }
+
+    private function cleanupTempDir(TransferJob $job): void
+    {
+        $override = $job->getSourceDirOverride();
+        if ($override !== null && is_dir($override)) {
+            $this->transcodeService->deleteDirectory($override);
         }
     }
 

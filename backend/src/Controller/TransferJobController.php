@@ -2,10 +2,14 @@
 
 namespace App\Controller;
 
+use App\Entity\TranscodeJob;
 use App\Entity\TransferJob;
+use App\Message\TranscodeJobMessage;
 use App\Message\TransferJobMessage;
 use App\Repository\CachedMediaRepository;
 use App\Repository\ProfileRepository;
+use App\Repository\TranscodeJobRepository;
+use App\Repository\TranscodeProfileRepository;
 use App\Repository\TransferJobRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -19,7 +23,9 @@ class TransferJobController extends AbstractApiController
     public function __construct(
         private readonly ProfileRepository $profileRepo,
         private readonly TransferJobRepository $jobRepo,
+        private readonly TranscodeJobRepository $transcodeJobRepo,
         private readonly CachedMediaRepository $mediaRepo,
+        private readonly TranscodeProfileRepository $transcodeProfileRepo,
         private readonly MessageBusInterface $bus,
         private readonly EntityManagerInterface $em,
     ) {}
@@ -56,6 +62,9 @@ class TransferJobController extends AbstractApiController
             return $this->badRequest('mediaIds array is required');
         }
 
+        $transcodeProfileId = isset($data['transcodeProfileId']) ? (int) $data['transcodeProfileId'] : null;
+        $transcodeProfile   = $transcodeProfileId ? $this->transcodeProfileRepo->find($transcodeProfileId) : null;
+
         $created = [];
 
         foreach ($mediaIds as $mediaId) {
@@ -64,14 +73,26 @@ class TransferJobController extends AbstractApiController
                 continue;
             }
 
-            $job = new TransferJob();
-            $job->setProfile($profile);
-            $job->setSourceMedia($media);
-            $this->em->persist($job);
-            $this->em->flush();
+            if ($transcodeProfile !== null) {
+                $job = new TranscodeJob();
+                $job->setProfile($profile);
+                $job->setSourceMedia($media);
+                $job->setTranscodeProfile($transcodeProfile);
+                $this->em->persist($job);
+                $this->em->flush();
 
-            $this->bus->dispatch(new TransferJobMessage($job->getId()));
-            $created[] = $this->jobToArray($job);
+                $this->bus->dispatch(new TranscodeJobMessage($job->getId()));
+                $created[] = $this->transcodeJobToArray($job);
+            } else {
+                $job = new TransferJob();
+                $job->setProfile($profile);
+                $job->setSourceMedia($media);
+                $this->em->persist($job);
+                $this->em->flush();
+
+                $this->bus->dispatch(new TransferJobMessage($job->getId()));
+                $created[] = $this->jobToArray($job);
+            }
         }
 
         return $this->json($created, 201);

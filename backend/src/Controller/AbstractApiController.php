@@ -38,6 +38,25 @@ abstract class AbstractApiController extends AbstractController
         ];
     }
 
+    protected function transcodeJobToArray(\App\Entity\TranscodeJob $job): array
+    {
+        $tp = $job->getTranscodeProfile();
+        return [
+            'id'              => $job->getId(),
+            'profileId'       => $job->getProfile()->getId(),
+            'sourceMedia'     => $this->mediaToArray($job->getSourceMedia()),
+            'transcodeProfile' => ['id' => $tp->getId(), 'name' => $tp->getName()],
+            'status'          => $job->getStatus(),
+            'bytesDone'       => $job->getBytesDone(),
+            'totalBytes'      => $job->getTotalBytes(),
+            'progressPercent' => $job->getProgressPercent(),
+            'errorMessage'    => $job->getErrorMessage(),
+            'queuedAt'        => $job->getQueuedAt()->format(\DateTimeInterface::ATOM),
+            'startedAt'       => $job->getStartedAt()?->format(\DateTimeInterface::ATOM),
+            'completedAt'     => $job->getCompletedAt()?->format(\DateTimeInterface::ATOM),
+        ];
+    }
+
     protected function jobToArray(\App\Entity\TransferJob $job): array
     {
         return [

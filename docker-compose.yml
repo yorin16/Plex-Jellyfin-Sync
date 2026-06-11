@@ -5,11 +5,13 @@ services:
       dockerfile: docker/php/Dockerfile
     volumes:
       - ${PLEX_MEDIA_PATH:-/mnt/user/Media/Movies}:/var/media/source:ro
+      - ${TRANSCODE_TEMP_PATH:-/mnt/user/media-share/.transcode}:/var/media/transcode
     environment:
       APP_ENV: prod
       APP_SECRET: ${APP_SECRET}
       DATABASE_URL: mysql://${DB_USER:-media_sync}:${DB_PASSWORD}@${MYSQL_HOST:-MariaDB-Official}:3306/${DB_NAME:-media_sync}?serverVersion=${MARIADB_VERSION:-mariadb-12.3}&charset=utf8mb4
       MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=1
+      TRANSCODE_BASE_PATH: /var/media/transcode
     networks:
       - app_network
     restart: unless-stopped
@@ -21,11 +23,35 @@ services:
     command: php bin/console messenger:consume async --time-limit=3600 -vv
     volumes:
       - ${PLEX_MEDIA_PATH:-/mnt/user/Media/Movies}:/var/media/source:ro
+      - ${TRANSCODE_TEMP_PATH:-/mnt/user/media-share/.transcode}:/var/media/transcode
     environment:
       APP_ENV: prod
       APP_SECRET: ${APP_SECRET}
       DATABASE_URL: mysql://${DB_USER:-media_sync}:${DB_PASSWORD}@${MYSQL_HOST:-MariaDB-Official}:3306/${DB_NAME:-media_sync}?serverVersion=${MARIADB_VERSION:-mariadb-12.3}&charset=utf8mb4
       MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=1
+      TRANSCODE_BASE_PATH: /var/media/transcode
+    depends_on:
+      - php
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  worker-transcode:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    command: php bin/console messenger:consume transcode --time-limit=3600 -vv
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - ${PLEX_MEDIA_PATH:-/mnt/user/Media/Movies}:/var/media/source:ro
+      - ${TRANSCODE_TEMP_PATH:-/mnt/user/media-share/.transcode}:/var/media/transcode
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: mysql://${DB_USER:-media_sync}:${DB_PASSWORD}@${MYSQL_HOST:-MariaDB-Official}:3306/${DB_NAME:-media_sync}?serverVersion=${MARIADB_VERSION:-mariadb-12.3}&charset=utf8mb4
+      MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=1
+      TRANSCODE_BASE_PATH: /var/media/transcode
     depends_on:
       - php
     networks:
