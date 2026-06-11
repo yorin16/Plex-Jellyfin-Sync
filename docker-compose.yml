@@ -39,7 +39,7 @@ services:
   worker-transcode:
     build:
       context: .
-      dockerfile: docker/php/Dockerfile
+      dockerfile: docker/worker-transcode/Dockerfile
     command: php bin/console messenger:consume transcode --time-limit=3600 -vv
     devices:
       - /dev/dri:/dev/dri
@@ -52,8 +52,6 @@ services:
       DATABASE_URL: mysql://${DB_USER:-media_sync}:${DB_PASSWORD}@${MYSQL_HOST:-MariaDB-Official}:3306/${DB_NAME:-media_sync}?serverVersion=${MARIADB_VERSION:-mariadb-12.3}&charset=utf8mb4
       MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=1
       TRANSCODE_BASE_PATH: /var/media/transcode
-      LIBVA_DRIVER_NAME: iHD
-      LIBVA_DRIVERS_PATH: /usr/lib/dri
     depends_on:
       - php
     networks:
