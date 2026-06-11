@@ -65,6 +65,14 @@
               ⚙ {{ p.name }}
             </option>
           </select>
+          <router-link
+            v-else
+            to="/transcode-profiles"
+            class="btn btn-ghost"
+            style="font-size: 12px; white-space: nowrap;"
+          >
+            + Add transcode profile
+          </router-link>
           <button
             class="btn btn-primary"
             :disabled="selectedIds.size === 0"

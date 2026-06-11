@@ -4,6 +4,7 @@
       <div class="sidebar-brand">Media Sync</div>
       <router-link to="/" class="nav-link">Dashboard</router-link>
       <router-link to="/profiles" class="nav-link">Profiles</router-link>
+      <router-link to="/transcode-profiles" class="nav-link">Transcode Profiles</router-link>
     </nav>
     <main class="content">
       <router-view />
