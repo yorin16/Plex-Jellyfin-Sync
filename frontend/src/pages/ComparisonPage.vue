@@ -78,7 +78,7 @@
             :disabled="selectedIds.size === 0"
             @click="queueSelected"
           >
-            Queue {{ selectedIds.size > 0 ? selectedIds.size : '' }} Selected
+            {{ selectedTranscodeProfileId ? '⚙ Transcode' : 'Queue' }} {{ selectedIds.size > 0 ? selectedIds.size : '' }} Selected
           </button>
         </div>
 
@@ -143,7 +143,7 @@
                       :disabled="item.validation?.status === 'rejected' && !overriddenIds.has(item.id)"
                       @click="queueOne(item.id)"
                     >
-                      Queue
+                      {{ selectedTranscodeProfileId ? '⚙ Transcode' : 'Queue' }}
                     </button>
                     <button
                       class="btn btn-ghost"
