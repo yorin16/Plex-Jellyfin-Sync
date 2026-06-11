@@ -69,9 +69,9 @@
             <thead>
               <tr>
                 <th style="width: 40px;"></th>
-                <th>Title</th>
-                <th>Year</th>
-                <th>Size</th>
+                <th class="sortable" @click="setSort('title')">Title <span class="sort-icon">{{ sortIcon('title') }}</span></th>
+                <th class="sortable" @click="setSort('year')">Year <span class="sort-icon">{{ sortIcon('year') }}</span></th>
+                <th class="sortable" @click="setSort('fileSize')">Size <span class="sort-icon">{{ sortIcon('fileSize') }}</span></th>
                 <th>Codec</th>
                 <th>Resolution</th>
                 <th>HDR</th>
@@ -80,7 +80,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in onlyInSource" :key="item.id">
+              <tr v-for="item in sortedSource" :key="item.id">
                 <td>
                   <input
                     type="checkbox"
@@ -214,6 +214,8 @@ const potentialMatches = ref([])
 const activeTab = ref('missing')
 const selectedIds = reactive(new Set())
 const overriddenIds = reactive(new Set())
+const sortKey = ref('title')
+const sortDir = ref('asc')
 
 const tabs = [
   { key: 'missing',   label: 'Missing from Destination' },
@@ -232,6 +234,31 @@ const selectedSize = computed(() =>
     .filter(i => selectedIds.has(i.id))
     .reduce((sum, i) => sum + (i.fileSize ?? 0), 0)
 )
+
+const sortedSource = computed(() => {
+  const key = sortKey.value
+  const dir = sortDir.value === 'asc' ? 1 : -1
+  return [...onlyInSource.value].sort((a, b) => {
+    const av = a[key] ?? ''
+    const bv = b[key] ?? ''
+    if (typeof av === 'number') return (av - bv) * dir
+    return String(av).localeCompare(String(bv)) * dir
+  })
+})
+
+function setSort(key) {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortKey.value = key
+    sortDir.value = key === 'fileSize' ? 'desc' : 'asc'
+  }
+}
+
+function sortIcon(key) {
+  if (sortKey.value !== key) return '↕'
+  return sortDir.value === 'asc' ? '↑' : '↓'
+}
 
 async function load() {
   loading.value = true
@@ -336,6 +363,9 @@ onMounted(() => {
 }
 
 .toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.sortable:hover { color: #e2e8f0; }
+.sort-icon { color: #64748b; font-size: 11px; }
 .disk-usage-bar { margin-bottom: 20px; }
 .disk-usage-info { display: flex; gap: 16px; font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
 .disk-usage-info span:first-child { color: #e2e8f0; font-weight: 500; }
