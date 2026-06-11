@@ -26,7 +26,11 @@
         <tbody>
           <tr v-for="p in profiles" :key="p.id">
             <td style="font-weight: 500;">{{ p.name }}</td>
-            <td><code style="font-size: 12px;">{{ p.videoCodec }}</code></td>
+            <td>
+              <code style="font-size: 12px;">{{ p.videoCodec }}</code>
+              <span v-if="p.videoCodec.endsWith('_vaapi')" style="font-size: 11px; color: #10b981; margin-left: 6px;">VA-API</span>
+              <span v-else-if="p.videoCodec.endsWith('_qsv')" style="font-size: 11px; color: #f59e0b; margin-left: 6px;">QSV</span>
+            </td>
             <td>{{ p.videoBitrateKbps.toLocaleString() }} kbps</td>
             <td>{{ p.maxHeight ? p.maxHeight + 'p' : 'unchanged' }}</td>
             <td>
@@ -59,10 +63,18 @@
           </label>
           <label>Video codec
             <select class="input" v-model="modal.videoCodec">
-              <option value="hevc_qsv">hevc_qsv (H.265 QuickSync)</option>
-              <option value="h264_qsv">h264_qsv (H.264 QuickSync)</option>
-              <option value="libx265">libx265 (H.265 software)</option>
-              <option value="libx264">libx264 (H.264 software)</option>
+              <optgroup label="VA-API (recommended for Intel iGPU on Linux)">
+                <option value="hevc_vaapi">hevc_vaapi (H.265 VA-API)</option>
+                <option value="h264_vaapi">h264_vaapi (H.264 VA-API)</option>
+              </optgroup>
+              <optgroup label="QuickSync / oneVPL (requires extra runtime)">
+                <option value="hevc_qsv">hevc_qsv (H.265 QuickSync)</option>
+                <option value="h264_qsv">h264_qsv (H.264 QuickSync)</option>
+              </optgroup>
+              <optgroup label="Software (CPU)">
+                <option value="libx265">libx265 (H.265 software)</option>
+                <option value="libx264">libx264 (H.264 software)</option>
+              </optgroup>
             </select>
           </label>
           <label>Video bitrate (kbps)
@@ -72,8 +84,13 @@
             <input class="input" type="number" v-model.number="modal.maxHeight" placeholder="e.g. 1080 (blank = no resize)" min="240" max="2160" />
           </label>
           <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-            <input type="checkbox" v-model="modal.hdrToSdr" />
-            Convert HDR → SDR (vpp_qsv tonemap)
+            <input type="checkbox" v-model="modal.hdrToSdr" :disabled="modal.videoCodec?.endsWith('_vaapi')" />
+            <span :style="modal.videoCodec?.endsWith('_vaapi') ? 'opacity: 0.4' : ''">
+              Convert HDR → SDR
+              <span v-if="modal.videoCodec?.endsWith('_qsv')" style="color: #64748b; font-size: 12px;">(vpp_qsv tonemap)</span>
+              <span v-else-if="modal.videoCodec?.endsWith('_vaapi')" style="color: #f59e0b; font-size: 12px;">— not supported with VA-API</span>
+              <span v-else style="color: #64748b; font-size: 12px;">(zscale software tonemap)</span>
+            </span>
           </label>
           <label>Lossless audio codec
             <select class="input" v-model="modal.losslessAudioCodec">

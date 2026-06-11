@@ -87,11 +87,14 @@ class TranscodeService
             ? (int) (($videoBitrate + $profile->getLosslessAudioBitrateKbps()) * 1000 / 8 * $duration)
             : PHP_INT_MAX;
 
-        $isQsv = str_ends_with($profile->getVideoCodec(), '_qsv');
-        $args  = ['ffmpeg'];
+        $isQsv   = str_ends_with($profile->getVideoCodec(), '_qsv');
+        $isVaapi = str_ends_with($profile->getVideoCodec(), '_vaapi');
+        $args    = ['ffmpeg'];
 
         if ($isQsv) {
             array_push($args, '-hwaccel', 'qsv', '-hwaccel_output_format', 'qsv');
+        } elseif ($isVaapi) {
+            array_push($args, '-hwaccel', 'vaapi', '-hwaccel_device', '/dev/dri/renderD128', '-hwaccel_output_format', 'vaapi');
         }
 
         array_push($args, '-i', $inputPath, '-map', '0');
@@ -103,6 +106,9 @@ class TranscodeService
                 $vf = $profile->isHdrToSdr()
                     ? "vpp_qsv=tonemap=1:w=-2:h={$h}"
                     : "scale_qsv=-2:{$h}";
+            } elseif ($isVaapi) {
+                // VA-API: scale in hardware; tone-mapping not natively supported via scale_vaapi
+                $vf = "scale_vaapi=w=-2:h={$h}";
             } else {
                 $vf = $profile->isHdrToSdr()
                     ? "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,scale=-2:{$h}"
