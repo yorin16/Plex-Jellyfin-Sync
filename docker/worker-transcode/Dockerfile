@@ -1,13 +1,15 @@
 FROM php:8.4-cli-bookworm
 
-# Add non-free repo for intel-media-va-driver-non-free (required for 6th gen+ iGPU)
-RUN echo "deb http://deb.debian.org/debian bookworm contrib non-free non-free-firmware" \
-        > /etc/apt/sources.list.d/non-free.list
+# php:*-bookworm uses DEB822-format sources without non-free.
+# Replace with classic format so intel-media-va-driver-non-free is reachable.
+RUN rm -f /etc/apt/sources.list.d/debian.sources \
+    && echo 'deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware' > /etc/apt/sources.list \
+    && echo 'deb http://deb.debian.org/debian bookworm-updates main contrib non-free non-free-firmware' >> /etc/apt/sources.list \
+    && echo 'deb http://deb.debian.org/debian-security bookworm-security main contrib non-free' >> /etc/apt/sources.list
 
-# ffmpeg on Debian Bookworm is compiled with --enable-libmfx which uses Intel
-# Media SDK; libmfx1 provides the runtime and intel-media-va-driver-non-free
-# provides the iHD driver that backs it — this chain works for hevc_qsv on
-# Intel 6th gen and newer (including 12th/13th/14th gen Raptor Lake).
+# ffmpeg on Debian Bookworm is compiled with --enable-libmfx (Intel Media SDK).
+# libmfx1 provides the MFX runtime; intel-media-va-driver-non-free provides
+# the iHD VA-API driver that backs it for 6th gen+ iGPU (including 14th gen).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git unzip libzip-dev rsync openssh-client sshpass \
         ffmpeg libmfx1 intel-media-va-driver-non-free \
