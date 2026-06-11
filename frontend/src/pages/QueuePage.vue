@@ -5,9 +5,24 @@
       <h1 class="page-title" style="margin: 0;">Transfer Queue</h1>
       <div style="margin-left: auto; display: flex; gap: 8px;">
         <router-link :to="`/profiles/${profileId}/compare`" class="btn btn-ghost">Compare</router-link>
-        <button class="btn btn-ghost" @click="load">↺ Refresh</button>
+        <button class="btn btn-ghost" @click="load(); loadDiskUsage()">↺ Refresh</button>
         <button class="btn btn-danger" style="font-size: 13px;" @click="clearFinished">Clear finished</button>
       </div>
+    </div>
+
+    <!-- Disk usage -->
+    <div v-if="diskUsage" class="disk-usage-bar">
+      <div class="disk-usage-info">
+        <span>Destination</span>
+        <span>{{ formatBytes(diskUsage.used) }} used of {{ formatBytes(diskUsage.total) }}</span>
+        <span style="color: #64748b;">{{ formatBytes(diskUsage.free) }} free</span>
+      </div>
+      <div class="disk-bar">
+        <div class="disk-bar-fill" :style="{ width: Math.round(diskUsage.used / diskUsage.total * 100) + '%', background: diskUsage.used / diskUsage.total > 0.9 ? '#f87171' : diskUsage.used / diskUsage.total > 0.75 ? '#fbbf24' : '#7c6af7' }"></div>
+      </div>
+    </div>
+    <div v-else-if="diskUsageError" style="font-size: 12px; color: #f87171; margin-bottom: 16px;">
+      Disk usage unavailable: {{ diskUsageError }}
     </div>
 
     <!-- Filter tabs -->
@@ -97,13 +112,15 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { jobs } from '@/api'
+import { jobs, transferConfig } from '@/api'
 
 const route = useRoute()
 const profileId = Number(route.params.id)
 
 const allJobs = ref([])
 const activeStatus = ref('all')
+const diskUsage = ref(null)
+const diskUsageError = ref(null)
 let interval = null
 
 const statusFilters = [
@@ -130,6 +147,16 @@ const filteredJobs = computed(() =>
 
 async function load() {
   allJobs.value = await jobs.list(profileId).catch(() => [])
+}
+
+async function loadDiskUsage() {
+  diskUsageError.value = null
+  try {
+    diskUsage.value = await transferConfig.diskUsage(profileId)
+  } catch (e) {
+    diskUsageError.value = e.response?.data?.error ?? e.message
+    diskUsage.value = null
+  }
 }
 
 async function cancel(id) {
@@ -170,6 +197,7 @@ function formatDate(iso) {
 
 onMounted(() => {
   load()
+  loadDiskUsage()
   interval = setInterval(load, 3000)
 })
 onUnmounted(() => clearInterval(interval))
@@ -192,4 +220,9 @@ onUnmounted(() => clearInterval(interval))
 .tab-btn.active { color: #e2e8f0; border-bottom-color: #7c6af7; }
 .tab-count { background: #2d3148; border-radius: 10px; padding: 1px 7px; font-size: 11px; }
 .error-msg { font-size: 12px; color: #f87171; max-width: 200px; }
+.disk-usage-bar { margin-bottom: 20px; }
+.disk-usage-info { display: flex; gap: 16px; font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
+.disk-usage-info span:first-child { color: #e2e8f0; font-weight: 500; }
+.disk-bar { height: 6px; background: #2d3148; border-radius: 3px; overflow: hidden; }
+.disk-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
 </style>

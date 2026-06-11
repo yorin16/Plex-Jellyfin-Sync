@@ -49,8 +49,9 @@ export const jobs = {
 }
 
 export const transferConfig = {
-  get: (profileId)       => api.get(`/profiles/${profileId}/transfer-config`).then(r => r.data),
-  save: (profileId, data)=> api.put(`/profiles/${profileId}/transfer-config`, data).then(r => r.data),
+  get: (profileId)        => api.get(`/profiles/${profileId}/transfer-config`).then(r => r.data),
+  save: (profileId, data) => api.put(`/profiles/${profileId}/transfer-config`, data).then(r => r.data),
+  diskUsage: (profileId)  => api.get(`/profiles/${profileId}/transfer-config/disk-usage`).then(r => r.data),
 }
 
 export const validationRules = {

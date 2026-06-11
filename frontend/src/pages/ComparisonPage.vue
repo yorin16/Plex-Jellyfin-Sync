@@ -37,6 +37,9 @@
             <input type="checkbox" @change="toggleAll" :checked="selectedIds.size === onlyInSource.length" />
             Select all
           </label>
+          <span v-if="selectedIds.size > 0" style="color: #94a3b8; font-size: 13px;">
+            {{ formatBytes(selectedSize) }}
+          </span>
           <button
             class="btn btn-primary"
             :disabled="selectedIds.size === 0"
@@ -206,6 +209,12 @@ const tabCounts = computed(() => ({
   destOnly:  onlyInDest.value.length,
   potential: potentialMatches.value.length,
 }))
+
+const selectedSize = computed(() =>
+  onlyInSource.value
+    .filter(i => selectedIds.has(i.id))
+    .reduce((sum, i) => sum + (i.fileSize ?? 0), 0)
+)
 
 async function load() {
   loading.value = true
