@@ -118,7 +118,9 @@ class TranscodeService
         // the target height avoids unnecessary GPU compute.
         if ($profile->getMaxHeight() !== null) {
             $h = $profile->getMaxHeight();
-            $needsScale = $sourceHeight === null || $sourceHeight > $h;
+            // Only scale when source is at least 1.5× the target height — catches genuine 4K
+            // (2160px) while leaving 1080p, padded 1088p, and narrower-aspect sources untouched.
+            $needsScale = $sourceHeight === null || $sourceHeight > (int) round($h * 1.5);
 
             if ($needsScale) {
                 if ($isQsv) {
