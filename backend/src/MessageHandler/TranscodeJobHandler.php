@@ -87,6 +87,14 @@ class TranscodeJobHandler
         $audioStreams  = $probeData['audioStreams'];
         $sourceHeight = $probeData['videoHeight'];
 
+        $this->logger->info('Transcode job {id}: duration={dur}s, source height={h}px, audio streams={n}, file={f}', [
+            'id'  => $job->getId(),
+            'dur' => $duration,
+            'h'   => $sourceHeight ?? 'unknown',
+            'n'   => count($audioStreams),
+            'f'   => $videoFile->getFilename(),
+        ]);
+
         $estimatedBytes = $duration > 0
             ? (int) (
                 ($job->getTranscodeProfile()->getVideoBitrateKbps()
