@@ -11,8 +11,10 @@ pipeline {
             steps {
                 // docker compose plugin is not inside the Jenkins container; use the
                 // standalone binary installed in the persistent Jenkins home volume.
+                // .env is gitignored — copy from the stable host path before building.
                 sh '''
                     export PATH="$PATH:/var/jenkins_home/bin"
+                    cp /mnt/user/media-share/.env .env 2>/dev/null || true
                     docker-compose build
                 '''
             }
@@ -22,6 +24,7 @@ pipeline {
             steps {
                 sh '''
                     export PATH="$PATH:/var/jenkins_home/bin"
+                    cp /mnt/user/media-share/.env .env 2>/dev/null || true
                     docker-compose up -d
                 '''
                 echo 'Containers started with updated images.'
