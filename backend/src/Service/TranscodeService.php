@@ -262,8 +262,7 @@ class TranscodeService
                 }
             }
 
-            // Parse -progress pipe:1 key=value lines; use out_time_us for reliable
-            // time-based progress (total_size stays 0 with VA-API / MKV muxer)
+            // Parse -progress pipe:1 key=value lines
             $lines       = explode("\n", $progressBuf);
             $progressBuf = (string) array_pop($lines);
             $outTimeUs   = null;
@@ -272,15 +271,25 @@ class TranscodeService
             foreach ($lines as $line) {
                 $line = trim($line);
                 if (str_starts_with($line, 'out_time_us=')) {
-                    $outTimeUs = (int) substr($line, 12);
+                    $v = substr($line, 12);
+                    if (is_numeric($v)) {
+                        $outTimeUs = (int) $v;
+                    }
                 } elseif (str_starts_with($line, 'fps=')) {
-                    $fps = (float) substr($line, 4);
+                    $v = trim(substr($line, 4));
+                    if (is_numeric($v)) {
+                        $fps = (float) $v;
+                    }
                 } elseif (str_starts_with($line, 'speed=')) {
-                    $speed = substr($line, 6); // e.g. "4.23x"
+                    $speed = trim(substr($line, 6)); // e.g. "4.23x" or "N/A"
                 }
             }
 
             $now = time();
+
+            // Use out_time_us / total_duration for progress when duration is known.
+            // If duration could not be probed (durationUs=0), the progress bar stays at
+            // 0% during encoding and jumps to 100% on completion — that's acceptable.
             if ($outTimeUs !== null && $outTimeUs > 0 && $durationUs > 0) {
                 $bytesDone = (int) min($outTimeUs / $durationUs * $estimatedBytes, $estimatedBytes);
                 if ($now - $lastReport >= 5) {

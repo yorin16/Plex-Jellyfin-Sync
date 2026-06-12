@@ -112,7 +112,15 @@ class TranscodeJobHandler
                     $job->setTotalBytes($totalBytes);
                     $job->setCurrentFps($fps);
                     $job->setCurrentSpeed($speed);
-                    $this->em->flush();
+                    try {
+                        $this->em->flush();
+                    } catch (\Throwable $e) {
+                        // Log but do NOT propagate — a failed DB update must not kill the FFmpeg process
+                        $this->logger->error('Progress flush failed for transcode job {id}: {msg}', [
+                            'id'  => $job->getId(),
+                            'msg' => $e->getMessage(),
+                        ]);
+                    }
                     $lastReport = $now;
                 }
             },
