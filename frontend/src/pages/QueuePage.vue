@@ -230,6 +230,8 @@ async function load() {
     jobs.list(profileId).catch(() => []),
     transcodeJobs.list(profileId).catch(() => []),
   ])
+  const running = allTranscodeJobs.value.filter(j => j.status === 'running')
+  if (running.length) console.log('[transcode debug]', JSON.stringify(running, null, 2))
 }
 
 async function loadDiskUsage() {
