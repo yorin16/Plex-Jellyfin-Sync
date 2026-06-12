@@ -9,17 +9,21 @@ pipeline {
     stages {
         stage('Build') {
             steps {
-                // Rebuild all images from the updated source. Docker's layer cache
-                // means only changed layers are rebuilt — COPY backend/ invalidates
-                // automatically whenever any PHP/config file changes.
-                sh 'docker compose build'
+                // docker compose plugin is not inside the Jenkins container; use the
+                // standalone binary installed in the persistent Jenkins home volume.
+                sh '''
+                    export PATH="$PATH:/var/jenkins_home/bin"
+                    docker-compose build
+                '''
             }
         }
 
         stage('Deploy') {
             steps {
-                // Restart containers with the newly built images.
-                sh 'docker compose up -d'
+                sh '''
+                    export PATH="$PATH:/var/jenkins_home/bin"
+                    docker-compose up -d
+                '''
                 echo 'Containers started with updated images.'
             }
         }
