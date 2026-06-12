@@ -82,9 +82,10 @@ class TranscodeJobHandler
 
         $outputPath = $outputDir . '/' . $videoFile->getFilename();
 
-        $probeData   = $this->transcodeService->probeFile($videoFile->getRealPath());
-        $duration    = $probeData['duration'];
-        $audioStreams = $probeData['audioStreams'];
+        $probeData    = $this->transcodeService->probeFile($videoFile->getRealPath());
+        $duration     = $probeData['duration'];
+        $audioStreams  = $probeData['audioStreams'];
+        $sourceHeight = $probeData['videoHeight'];
 
         $estimatedBytes = $duration > 0
             ? (int) (
@@ -113,6 +114,7 @@ class TranscodeJobHandler
                     $lastReport = $now;
                 }
             },
+            $sourceHeight,
         );
 
         $this->transcodeService->copyNonVideoFiles($sourceFolder, $outputDir, $videoFile->getFilename());

@@ -53,6 +53,7 @@ services:
       MESSENGER_TRANSPORT_DSN: doctrine://default?auto_setup=1
       TRANSCODE_BASE_PATH: /var/media/transcode
       LIBVA_DRIVER_NAME: iHD
+      LIBVA_DRIVERS_PATH: /usr/lib/x86_64-linux-gnu/dri
     depends_on:
       - php
     networks:
