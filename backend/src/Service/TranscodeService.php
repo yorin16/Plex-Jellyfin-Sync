@@ -230,7 +230,7 @@ class TranscodeService
 
         $proc = proc_open($cmd, [
             0 => ['pipe', 'r'],
-            1 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
             2 => ['file', $stderrFile, 'w'],
         ], $pipes);
 
