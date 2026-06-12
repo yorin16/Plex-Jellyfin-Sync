@@ -226,8 +226,6 @@ class TranscodeService
         $cmd        = implode(' ', array_map('escapeshellarg', $args));
         $stderrFile = tempnam(sys_get_temp_dir(), 'ffmpeg_err_');
 
-        error_log('[transcode] Starting FFmpeg: ' . $cmd);
-
         $proc = proc_open($cmd, [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'w'],
@@ -241,7 +239,6 @@ class TranscodeService
 
         fclose($pipes[0]);
         stream_set_blocking($pipes[1], false);
-        error_log('[transcode] FFmpeg process started, reading stdout...');
 
         $progressBuf = '';
         $stdoutDone  = false;
@@ -261,7 +258,6 @@ class TranscodeService
                     continue;
                 }
                 if ($chunk !== '') {
-                    error_log('[transcode] stdout chunk (' . strlen($chunk) . ' bytes): ' . substr($chunk, 0, 200));
                     $progressBuf .= $chunk;
                 }
             }
@@ -294,10 +290,6 @@ class TranscodeService
             // Use out_time_us / total_duration for progress when duration is known.
             // If duration could not be probed (durationUs=0), the progress bar stays at
             // 0% during encoding and jumps to 100% on completion — that's acceptable.
-            if ($outTimeUs !== null) {
-                error_log('[transcode] out_time_us=' . $outTimeUs . ' fps=' . ($fps ?? 'null') . ' speed=' . ($speed ?? 'null'));
-            }
-
             if ($outTimeUs !== null && $outTimeUs > 0 && $durationUs > 0) {
                 $bytesDone = (int) min($outTimeUs / $durationUs * $estimatedBytes, $estimatedBytes);
                 if ($now - $lastReport >= 5) {
