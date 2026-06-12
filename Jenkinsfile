@@ -14,7 +14,7 @@ pipeline {
                 // .env is gitignored — copy from the stable host path before building.
                 sh '''
                     export PATH="$PATH:/var/jenkins_home/bin"
-                    cp /mnt/user/media-share/.env .env 2>/dev/null || true
+                    cp /var/jenkins_home/.env .env
                     docker-compose -p media-sync build
                 '''
             }
@@ -24,8 +24,8 @@ pipeline {
             steps {
                 sh '''
                     export PATH="$PATH:/var/jenkins_home/bin"
-                    cp /mnt/user/media-share/.env .env 2>/dev/null || true
-                    docker-compose -p media-sync up -d
+                    cp /var/jenkins_home/.env .env
+                    docker-compose -p media-sync up -d --force-recreate
                 '''
                 echo 'Containers started with updated images.'
             }
