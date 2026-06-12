@@ -15,7 +15,7 @@ pipeline {
                 sh '''
                     export PATH="$PATH:/var/jenkins_home/bin"
                     cp /mnt/user/media-share/.env .env 2>/dev/null || true
-                    docker-compose build
+                    docker-compose -p media-sync build
                 '''
             }
         }
@@ -25,7 +25,7 @@ pipeline {
                 sh '''
                     export PATH="$PATH:/var/jenkins_home/bin"
                     cp /mnt/user/media-share/.env .env 2>/dev/null || true
-                    docker-compose up -d
+                    docker-compose -p media-sync up -d
                 '''
                 echo 'Containers started with updated images.'
             }
