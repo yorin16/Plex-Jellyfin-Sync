@@ -49,9 +49,24 @@
       <template v-else>
         <div class="toolbar">
           <label>
-            <input type="checkbox" @change="toggleAll" :checked="selectedIds.size === onlyInSource.length" />
+            <input type="checkbox" @change="toggleAll" :checked="sortedSource.length > 0 && sortedSource.filter(i => i.validation?.status !== 'rejected' || overriddenIds.has(i.id)).every(i => selectedIds.has(i.id))" />
             Select all
           </label>
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #94a3b8;">
+            Min size
+            <input
+              type="number"
+              v-model="minSizeGb"
+              min="0"
+              step="1"
+              placeholder="GB"
+              class="size-filter-input"
+            />
+            GB
+          </label>
+          <span style="font-size: 12px; color: #64748b;">
+            {{ sortedSource.length }} / {{ onlyInSource.length }} shown
+          </span>
           <span v-if="selectedIds.size > 0" style="color: #94a3b8; font-size: 13px;">
             {{ formatBytes(selectedSize) }}
           </span>
@@ -256,6 +271,7 @@ const selectedIds = reactive(new Set())
 const overriddenIds = reactive(new Set())
 const sortKey = ref('title')
 const sortDir = ref('asc')
+const minSizeGb = ref('')
 
 const tabs = [
   { key: 'missing',   label: 'Missing from Destination' },
@@ -278,12 +294,15 @@ const selectedSize = computed(() =>
 const sortedSource = computed(() => {
   const key = sortKey.value
   const dir = sortDir.value === 'asc' ? 1 : -1
-  return [...onlyInSource.value].sort((a, b) => {
-    const av = a[key] ?? ''
-    const bv = b[key] ?? ''
-    if (typeof av === 'number') return (av - bv) * dir
-    return String(av).localeCompare(String(bv)) * dir
-  })
+  const minBytes = minSizeGb.value !== '' ? parseFloat(minSizeGb.value) * 1e9 : 0
+  return [...onlyInSource.value]
+    .filter(i => !minBytes || (i.fileSize ?? 0) >= minBytes)
+    .sort((a, b) => {
+      const av = a[key] ?? ''
+      const bv = b[key] ?? ''
+      if (typeof av === 'number') return (av - bv) * dir
+      return String(av).localeCompare(String(bv)) * dir
+    })
 })
 
 function setSort(key) {
@@ -318,7 +337,7 @@ async function load() {
 
 function toggleAll(e) {
   if (e.target.checked) {
-    onlyInSource.value
+    sortedSource.value
       .filter(i => i.validation?.status !== 'rejected' || overriddenIds.has(i.id))
       .forEach(i => selectedIds.add(i.id))
   } else {
@@ -409,6 +428,11 @@ onMounted(() => {
   color: #e2e8f0; padding: 6px 10px; font-size: 13px; cursor: pointer;
 }
 .transcode-select:focus { outline: none; border-color: #7c6af7; }
+.size-filter-input {
+  background: #13142a; border: 1px solid #2d3148; border-radius: 6px;
+  color: #e2e8f0; padding: 4px 8px; font-size: 13px; width: 64px; text-align: right;
+}
+.size-filter-input:focus { outline: none; border-color: #7c6af7; }
 .sortable { cursor: pointer; user-select: none; white-space: nowrap; }
 .sortable:hover { color: #e2e8f0; }
 .sort-icon { color: #64748b; font-size: 11px; }
