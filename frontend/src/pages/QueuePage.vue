@@ -51,6 +51,7 @@
               <th>Movie</th>
               <th>Profile</th>
               <th>Progress</th>
+              <th>Speed</th>
               <th>Status</th>
               <th>Queued</th>
               <th>Actions</th>
@@ -78,6 +79,13 @@
                   </div>
                 </template>
                 <span v-else style="color: #64748b; font-size: 12px;">—</span>
+              </td>
+              <td style="white-space: nowrap; color: #94a3b8;">
+                <template v-if="job.status === 'running' && job.currentFps">
+                  <div>{{ job.currentFps.toFixed(1) }} fps</div>
+                  <div v-if="job.currentSpeed" style="font-size: 11px; color: #64748b;">{{ job.currentSpeed }}</div>
+                </template>
+                <span v-else>—</span>
               </td>
               <td>
                 <span class="badge" :class="statusBadge(job.status)">{{ job.status }}</span>

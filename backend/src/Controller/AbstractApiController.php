@@ -50,6 +50,8 @@ abstract class AbstractApiController extends AbstractController
             'bytesDone'       => $job->getBytesDone(),
             'totalBytes'      => $job->getTotalBytes(),
             'progressPercent' => $job->getProgressPercent(),
+            'currentFps'      => $job->getCurrentFps(),
+            'currentSpeed'    => $job->getCurrentSpeed(),
             'errorMessage'    => $job->getErrorMessage(),
             'queuedAt'        => $job->getQueuedAt()->format(\DateTimeInterface::ATOM),
             'startedAt'       => $job->getStartedAt()?->format(\DateTimeInterface::ATOM),

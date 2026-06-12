@@ -105,11 +105,13 @@ class TranscodeJobHandler
             $job->getTranscodeProfile(),
             $duration,
             $audioStreams,
-            function (int $bytesDone, int $totalBytes) use ($job, &$lastReport): void {
+            function (int $bytesDone, int $totalBytes, ?float $fps, ?string $speed) use ($job, &$lastReport): void {
                 $now = time();
                 if ($now - $lastReport >= 5) {
                     $job->setBytesDone($bytesDone);
                     $job->setTotalBytes($totalBytes);
+                    $job->setCurrentFps($fps);
+                    $job->setCurrentSpeed($speed);
                     $this->em->flush();
                     $lastReport = $now;
                 }

@@ -54,6 +54,12 @@ class TranscodeJob
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $completedAt = null;
 
+    #[ORM\Column(type: 'float', nullable: true)]
+    private ?float $currentFps = null;
+
+    #[ORM\Column(length: 16, nullable: true)]
+    private ?string $currentSpeed = null;
+
     public function __construct()
     {
         $this->queuedAt = new \DateTimeImmutable();
@@ -79,6 +85,10 @@ class TranscodeJob
     public function setStartedAt(?\DateTimeImmutable $startedAt): static { $this->startedAt = $startedAt; return $this; }
     public function getCompletedAt(): ?\DateTimeImmutable { return $this->completedAt; }
     public function setCompletedAt(?\DateTimeImmutable $completedAt): static { $this->completedAt = $completedAt; return $this; }
+    public function getCurrentFps(): ?float { return $this->currentFps; }
+    public function setCurrentFps(?float $currentFps): static { $this->currentFps = $currentFps; return $this; }
+    public function getCurrentSpeed(): ?string { return $this->currentSpeed; }
+    public function setCurrentSpeed(?string $currentSpeed): static { $this->currentSpeed = $currentSpeed; return $this; }
 
     public function getProgressPercent(): float
     {

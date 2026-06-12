@@ -284,7 +284,7 @@ class TranscodeService
             if ($outTimeUs !== null && $outTimeUs > 0 && $durationUs > 0) {
                 $bytesDone = (int) min($outTimeUs / $durationUs * $estimatedBytes, $estimatedBytes);
                 if ($now - $lastReport >= 5) {
-                    ($onProgress)($bytesDone, $estimatedBytes);
+                    ($onProgress)($bytesDone, $estimatedBytes, $fps, $speed);
                     $lastReport = $now;
                 }
             }
@@ -313,6 +313,6 @@ class TranscodeService
             );
         }
 
-        ($onProgress)($estimatedBytes, $estimatedBytes);
+        ($onProgress)($estimatedBytes, $estimatedBytes, null, null);
     }
 }
