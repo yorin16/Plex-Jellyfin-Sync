@@ -3,25 +3,32 @@ pipeline {
 
     environment {
         PORTAINER_URL = 'http://10.0.0.208:9001'
-        STACK_NAME    = 'media-sync'  // match the stack name in Portainer exactly
+        STACK_NAME    = 'media-sync'
     }
 
     stages {
-        stage('Deploy') {
+        stage('Build') {
             steps {
-                withCredentials([string(credentialsId: 'portainer-webhook', variable: 'WEBHOOK_URL')]) {
-                    sh 'curl -X POST "$WEBHOOK_URL"'
-                }
-                echo 'Webhook triggered — Portainer is pulling and redeploying...'
+                // Rebuild all images from the updated source. Docker's layer cache
+                // means only changed layers are rebuilt — COPY backend/ invalidates
+                // automatically whenever any PHP/config file changes.
+                sh 'docker compose build'
             }
         }
 
-        stage('Wait for containers') {
+        stage('Deploy') {
+            steps {
+                // Restart containers with the newly built images.
+                sh 'docker compose up -d'
+                echo 'Containers started with updated images.'
+            }
+        }
+
+        stage('Verify') {
             steps {
                 withCredentials([string(credentialsId: 'portainer-api-token', variable: 'PORTAINER_TOKEN')]) {
                     timeout(time: 10, unit: 'MINUTES') {
                         sh '''
-                            # Auto-discover the first available endpoint ID
                             ENDPOINT_ID=$(curl -sf -H "X-API-Key: $PORTAINER_TOKEN" \
                                 "${PORTAINER_URL}/api/endpoints" | grep -o '"Id":[0-9]*' | head -1 | grep -o '[0-9]*')
                             if [ -z "$ENDPOINT_ID" ]; then
