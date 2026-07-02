@@ -111,7 +111,11 @@ class TranscodeService
             array_push($args, '-hwaccel', 'vaapi', '-hwaccel_device', '/dev/dri/renderD128', '-hwaccel_output_format', 'vaapi');
         }
 
-        array_push($args, '-i', $inputPath, '-map', '0');
+        // Map real video streams + audio + subtitles only. Uppercase 'V' excludes attached
+        // pictures / cover-art thumbnails (mjpeg) — feeding those into hevc_vaapi fails with
+        // "No usable encoding profile found". Trailing '?' makes audio/subs optional so files
+        // without them don't abort. Cover art is dropped (Jellyfin supplies its own artwork).
+        array_push($args, '-i', $inputPath, '-map', '0:V', '-map', '0:a?', '-map', '0:s?');
 
         // Video filter: only add when resize is actually needed.
         // scale_vaapi runs on EU shaders — skipping it when the source is already at/below
@@ -185,22 +189,39 @@ class TranscodeService
         );
 
         foreach ($it as $item) {
+            // Skip the original (pre-transcode) video file — the transcoded copy is already in place.
             if ($item->getFilename() === $videoFilename && $item->isFile()) {
                 continue;
             }
-            $rel  = str_replace('\\', '/', substr($item->getRealPath(), strlen($sourceFolder) + 1));
+
+            $real = $item->getRealPath();
+            if ($real === false || !str_starts_with($real, $sourceFolder)) {
+                // Broken symlink, or a link resolving outside the source tree — skip so we never
+                // compute a bogus relative path and write files outside the destination folder.
+                continue;
+            }
+
+            $rel  = str_replace('\\', '/', substr($real, strlen($sourceFolder) + 1));
             $dest = $destFolder . '/' . $rel;
 
             if ($item->isDir()) {
                 if (!is_dir($dest)) {
                     mkdir($dest, 0755, true);
                 }
-            } else {
-                $destDir = dirname($dest);
-                if (!is_dir($destDir)) {
-                    mkdir($destDir, 0755, true);
-                }
-                copy($item->getRealPath(), $dest);
+                continue;
+            }
+
+            $destDir = dirname($dest);
+            if (!is_dir($destDir)) {
+                mkdir($destDir, 0755, true);
+            }
+            if (!@copy($real, $dest)) {
+                // Non-fatal: the transcoded video is the primary deliverable. Log so a dropped
+                // sidecar (e.g. an external .srt) is visible instead of silently missing.
+                $this->logger->warning('Failed to copy sidecar file {src} -> {dest}', [
+                    'src'  => $real,
+                    'dest' => $dest,
+                ]);
             }
         }
     }
