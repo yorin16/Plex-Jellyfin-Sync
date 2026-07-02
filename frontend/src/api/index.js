@@ -35,6 +35,7 @@ export const overrides = {
   create: (profileId, data) => api.post(`/profiles/${profileId}/overrides`, data).then(r => r.data),
   remove: (id)              => api.delete(`/overrides/${id}`),
   ignore: (profileId, data) => api.post(`/profiles/${profileId}/ignore`, data).then(r => r.data),
+  listIgnored: (profileId)  => api.get(`/profiles/${profileId}/ignored`).then(r => r.data),
   unignore: (id)            => api.delete(`/ignored/${id}`),
 }
 

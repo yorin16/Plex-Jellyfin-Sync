@@ -49,7 +49,7 @@
       <template v-else>
         <div class="toolbar">
           <label>
-            <input type="checkbox" @change="toggleAll" :checked="sortedSource.length > 0 && sortedSource.filter(i => i.validation?.status !== 'rejected' || overriddenIds.has(i.id)).every(i => selectedIds.has(i.id))" />
+            <input type="checkbox" @change="toggleAll" :checked="selectableSource.length > 0 && selectableSource.every(i => selectedIds.has(i.id))" />
             Select all
           </label>
           <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #94a3b8;">
@@ -63,6 +63,18 @@
               class="size-filter-input"
             />
             GB
+          </label>
+          <select v-model="codecFilter" class="transcode-select" title="Filter by codec">
+            <option value="">All codecs</option>
+            <option v-for="c in codecOptions" :key="c" :value="c">{{ c }}</option>
+          </select>
+          <select v-model="resolutionFilter" class="transcode-select" title="Filter by resolution">
+            <option value="">All resolutions</option>
+            <option v-for="r in resolutionOptions" :key="r" :value="r">{{ r }}</option>
+          </select>
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #94a3b8;">
+            <input type="checkbox" v-model="hideInProgress" />
+            Hide in progress
           </label>
           <span style="font-size: 12px; color: #64748b;">
             {{ sortedSource.length }} / {{ onlyInSource.length }} shown
@@ -115,8 +127,8 @@
                 <th class="sortable" @click="setSort('title')">Title <span class="sort-icon">{{ sortIcon('title') }}</span></th>
                 <th class="sortable" @click="setSort('year')">Year <span class="sort-icon">{{ sortIcon('year') }}</span></th>
                 <th class="sortable" @click="setSort('fileSize')">Size <span class="sort-icon">{{ sortIcon('fileSize') }}</span></th>
-                <th>Codec</th>
-                <th>Resolution</th>
+                <th class="sortable" @click="setSort('codec')">Codec <span class="sort-icon">{{ sortIcon('codec') }}</span></th>
+                <th class="sortable" @click="setSort('resolution')">Resolution <span class="sort-icon">{{ sortIcon('resolution') }}</span></th>
                 <th>HDR</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -128,7 +140,7 @@
                   <input
                     type="checkbox"
                     :checked="selectedIds.has(item.id)"
-                    :disabled="item.validation?.status === 'rejected' && !overriddenIds.has(item.id)"
+                    :disabled="(item.validation?.status === 'rejected' && !overriddenIds.has(item.id)) || !!item.queueStatus"
                     @change="toggleSelect(item.id)"
                   />
                 </td>
@@ -142,8 +154,10 @@
                   <span v-else style="color: #64748b;">—</span>
                 </td>
                 <td>
+                  <span v-if="item.queueStatus === 'transcode'" class="badge badge-blue">Transcoding</span>
+                  <span v-else-if="item.queueStatus === 'transfer'" class="badge badge-blue">In queue</span>
                   <span
-                    v-if="item.validation?.status !== 'allowed'"
+                    v-else-if="item.validation?.status !== 'allowed'"
                     class="badge"
                     :class="item.validation?.status === 'rejected' ? 'badge-red' : 'badge-yellow'"
                     :title="item.validation?.triggeredRules?.map(r => r.ruleType + ' ' + r.operator + ' ' + r.value).join(', ')"
@@ -165,7 +179,7 @@
                     <button
                       class="btn btn-primary"
                       style="font-size: 12px; padding: 4px 10px;"
-                      :disabled="item.validation?.status === 'rejected' && !overriddenIds.has(item.id)"
+                      :disabled="(item.validation?.status === 'rejected' && !overriddenIds.has(item.id)) || !!item.queueStatus"
                       @click="queueOne(item.id, null)"
                     >
                       Queue
@@ -174,7 +188,7 @@
                       v-if="availableTranscodeProfiles.length > 0"
                       class="btn btn-primary"
                       style="font-size: 12px; padding: 4px 10px; background: #d97706;"
-                      :disabled="(item.validation?.status === 'rejected' && !overriddenIds.has(item.id)) || !selectedTranscodeProfileId"
+                      :disabled="(item.validation?.status === 'rejected' && !overriddenIds.has(item.id)) || !!item.queueStatus || !selectedTranscodeProfileId"
                       :title="!selectedTranscodeProfileId ? 'Select a transcode profile in the toolbar first' : ''"
                       @click="queueOne(item.id, selectedTranscodeProfileId)"
                     >
@@ -244,6 +258,43 @@
         </div>
       </div>
     </div>
+
+    <!-- Ignored -->
+    <div v-if="activeTab === 'ignored'">
+      <div v-if="ignoredItems.length === 0" class="card empty-card">No ignored movies.</div>
+      <div v-else class="card" style="padding: 0;">
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Year</th>
+              <th>Size</th>
+              <th>Codec</th>
+              <th>Resolution</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in ignoredItems" :key="item.id">
+              <td style="font-weight: 500;">{{ item.sourceMedia.title }}</td>
+              <td>{{ item.sourceMedia.year }}</td>
+              <td style="white-space: nowrap;">{{ formatBytes(item.sourceMedia.fileSize) }}</td>
+              <td>{{ item.sourceMedia.codec || '—' }}</td>
+              <td>{{ item.sourceMedia.resolution || '—' }}</td>
+              <td>
+                <button
+                  class="btn btn-ghost"
+                  style="font-size: 12px; padding: 4px 10px;"
+                  @click="unignore(item)"
+                >
+                  Unignore
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -266,24 +317,37 @@ const selectedTranscodeProfileId = ref(null)
 const onlyInSource = ref([])
 const onlyInDest = ref([])
 const potentialMatches = ref([])
+const ignoredItems = ref([])
 const activeTab = ref('missing')
 const selectedIds = reactive(new Set())
 const overriddenIds = reactive(new Set())
 const sortKey = ref('title')
 const sortDir = ref('asc')
 const minSizeGb = ref('')
+const codecFilter = ref('')
+const resolutionFilter = ref('')
+const hideInProgress = ref(true)
 
 const tabs = [
   { key: 'missing',   label: 'Missing from Destination' },
   { key: 'destOnly',  label: 'Only in Destination' },
   { key: 'potential', label: 'Potential Matches' },
+  { key: 'ignored',   label: 'Ignored' },
 ]
 
 const tabCounts = computed(() => ({
   missing:   onlyInSource.value.length,
   destOnly:  onlyInDest.value.length,
   potential: potentialMatches.value.length,
+  ignored:   ignoredItems.value.length,
 }))
+
+const codecOptions = computed(() =>
+  [...new Set(onlyInSource.value.map(i => i.codec).filter(Boolean))].sort()
+)
+const resolutionOptions = computed(() =>
+  [...new Set(onlyInSource.value.map(i => i.resolution).filter(Boolean))].sort()
+)
 
 const selectedSize = computed(() =>
   onlyInSource.value
@@ -297,6 +361,9 @@ const sortedSource = computed(() => {
   const minBytes = minSizeGb.value !== '' ? parseFloat(minSizeGb.value) * 1e9 : 0
   return [...onlyInSource.value]
     .filter(i => !minBytes || (i.fileSize ?? 0) >= minBytes)
+    .filter(i => !codecFilter.value || i.codec === codecFilter.value)
+    .filter(i => !resolutionFilter.value || i.resolution === resolutionFilter.value)
+    .filter(i => !hideInProgress.value || !i.queueStatus)
     .sort((a, b) => {
       const av = a[key] ?? ''
       const bv = b[key] ?? ''
@@ -304,6 +371,13 @@ const sortedSource = computed(() => {
       return String(av).localeCompare(String(bv)) * dir
     })
 })
+
+// Rows eligible for selection: shown, not rejected (unless forced), not already queued
+const selectableSource = computed(() =>
+  sortedSource.value.filter(i =>
+    (i.validation?.status !== 'rejected' || overriddenIds.has(i.id)) && !i.queueStatus
+  )
+)
 
 function setSort(key) {
   if (sortKey.value === key) {
@@ -337,9 +411,7 @@ async function load() {
 
 function toggleAll(e) {
   if (e.target.checked) {
-    sortedSource.value
-      .filter(i => i.validation?.status !== 'rejected' || overriddenIds.has(i.id))
-      .forEach(i => selectedIds.add(i.id))
+    selectableSource.value.forEach(i => selectedIds.add(i.id))
   } else {
     selectedIds.clear()
   }
@@ -349,21 +421,47 @@ function toggleSelect(id) {
   selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id)
 }
 
+// Mark items as in-progress locally so they get the badge / hidden without a full refresh
+function markQueued(ids, transcodeProfileId) {
+  const status = transcodeProfileId ? 'transcode' : 'transfer'
+  const idSet = new Set(ids)
+  for (const item of onlyInSource.value) {
+    if (idSet.has(item.id)) {
+      item.queueStatus = status
+      selectedIds.delete(item.id)
+    }
+  }
+}
+
 async function queueOne(id, transcodeProfileId) {
   await jobs.queue(profileId, [id], transcodeProfileId)
+  markQueued([id], transcodeProfileId)
   toast(transcodeProfileId ? 'Added to transcode queue' : 'Added to queue')
 }
 
 async function queueSelected(transcodeProfileId) {
-  const count = selectedIds.size
-  await jobs.queue(profileId, [...selectedIds], transcodeProfileId)
-  selectedIds.clear()
-  toast(`${count} movie${count !== 1 ? 's' : ''} added to ${transcodeProfileId ? 'transcode' : 'transfer'} queue`)
+  const ids = [...selectedIds]
+  await jobs.queue(profileId, ids, transcodeProfileId)
+  markQueued(ids, transcodeProfileId)
+  toast(`${ids.length} movie${ids.length !== 1 ? 's' : ''} added to ${transcodeProfileId ? 'transcode' : 'transfer'} queue`)
 }
 
 async function ignore(id) {
   await overrides.ignore(profileId, { sourceMediaId: id })
+  selectedIds.delete(id)
   onlyInSource.value = onlyInSource.value.filter(i => i.id !== id)
+  loadIgnored()
+}
+
+async function loadIgnored() {
+  ignoredItems.value = await overrides.listIgnored(profileId).catch(() => [])
+}
+
+async function unignore(item) {
+  await overrides.unignore(item.id)
+  ignoredItems.value = ignoredItems.value.filter(i => i.id !== item.id)
+  // Bring it back into the comparison so it can be queued again
+  load()
 }
 
 async function acceptMatch(pair) {
@@ -395,6 +493,7 @@ async function loadDiskUsage() {
 
 onMounted(() => {
   load()
+  loadIgnored()
   loadDiskUsage()
   transcodeProfiles.list().then(p => { availableTranscodeProfiles.value = p })
 })

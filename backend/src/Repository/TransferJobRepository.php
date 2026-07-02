@@ -30,6 +30,21 @@ class TransferJobRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /** @return int[] source_media_ids with an active (queued/running) transfer job for this profile */
+    public function findActiveSourceIds(Profile $profile): array
+    {
+        $rows = $this->createQueryBuilder('j')
+            ->select('IDENTITY(j.sourceMedia) AS id')
+            ->where('j.profile = :profile')
+            ->andWhere('j.status IN (:statuses)')
+            ->setParameter('profile', $profile)
+            ->setParameter('statuses', [TransferJob::STATUS_QUEUED, TransferJob::STATUS_RUNNING])
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_map(fn($r) => (int) $r['id'], $rows);
+    }
+
     public function deleteFinishedByProfile(Profile $profile): int
     {
         return $this->createQueryBuilder('j')

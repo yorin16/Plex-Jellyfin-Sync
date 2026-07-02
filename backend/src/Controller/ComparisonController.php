@@ -3,6 +3,8 @@
 namespace App\Controller;
 
 use App\Repository\ProfileRepository;
+use App\Repository\TranscodeJobRepository;
+use App\Repository\TransferJobRepository;
 use App\Service\Matching\MatchingEngine;
 use App\Service\Validation\ValidationEngine;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -15,6 +17,8 @@ class ComparisonController extends AbstractApiController
         private readonly ProfileRepository $profileRepo,
         private readonly MatchingEngine $matchingEngine,
         private readonly ValidationEngine $validationEngine,
+        private readonly TransferJobRepository $transferJobRepo,
+        private readonly TranscodeJobRepository $transcodeJobRepo,
     ) {}
 
     #[Route('', methods: ['GET'])]
@@ -27,9 +31,17 @@ class ComparisonController extends AbstractApiController
 
         $result = $this->matchingEngine->compare($profile);
 
-        $onlyInSource = array_map(function ($item) use ($profile) {
+        $transferringIds = array_flip($this->transferJobRepo->findActiveSourceIds($profile));
+        $transcodingIds  = array_flip($this->transcodeJobRepo->findActiveSourceIds($profile));
+
+        $onlyInSource = array_map(function ($item) use ($profile, $transferringIds, $transcodingIds) {
             $validation = $this->validationEngine->check($item, $profile);
             $arr = $this->mediaToArray($item);
+            $arr['queueStatus'] = match (true) {
+                isset($transcodingIds[$item->getId()]) => 'transcode',
+                isset($transferringIds[$item->getId()]) => 'transfer',
+                default => null,
+            };
             $arr['validation'] = [
                 'status'       => $validation->status,
                 'triggeredRules' => array_map(fn($r) => [

@@ -17,6 +17,17 @@ class IgnoredItemRepository extends ServiceEntityRepository
         parent::__construct($registry, IgnoredItem::class);
     }
 
+    /** @return IgnoredItem[] ignored items for this profile, most recent first */
+    public function findByProfile(Profile $profile): array
+    {
+        return $this->createQueryBuilder('i')
+            ->where('i.profile = :profile')
+            ->setParameter('profile', $profile)
+            ->orderBy('i.createdAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
     /** @return int[] source_media_ids that are ignored for this profile */
     public function findIgnoredSourceIds(Profile $profile): array
     {

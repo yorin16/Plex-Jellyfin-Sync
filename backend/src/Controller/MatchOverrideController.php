@@ -70,6 +70,22 @@ class MatchOverrideController extends AbstractApiController
         return $this->json(null, 204);
     }
 
+    #[Route('/profiles/{id}/ignored', methods: ['GET'])]
+    public function listIgnored(int $id): JsonResponse
+    {
+        $profile = $this->profileRepo->find($id);
+        if (!$profile) {
+            return $this->notFound();
+        }
+
+        $items = $this->ignoredRepo->findByProfile($profile);
+        return $this->json(array_map(function (IgnoredItem $i) {
+            $arr = $this->ignoredToArray($i);
+            $arr['sourceMedia'] = $this->mediaToArray($i->getSourceMedia());
+            return $arr;
+        }, $items));
+    }
+
     #[Route('/profiles/{id}/ignore', methods: ['POST'])]
     public function createIgnore(int $id, Request $request): JsonResponse
     {
