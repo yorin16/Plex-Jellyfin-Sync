@@ -10,6 +10,14 @@ class TranscodeService
     private const VIDEO_EXTENSIONS = ['mkv', 'mp4', 'avi', 'mov', 'ts', 'm2ts', 'wmv'];
     private const LOSSLESS_CODECS  = ['truehd', 'mlp', 'flac'];
 
+    // Source codecs for which FFmpeg defaults to a *software* external decoder even though the
+    // Intel iGPU (Xe / UHD 770 and newer) can decode them in hardware. For AV1 the default is
+    // libdav1d, which has no hwaccel hook, so -hwaccel is silently ignored: the frame is decoded
+    // on the CPU and then can't be handed to the VAAPI/QSV encoder ("Impossible to convert between
+    // the formats"). Forcing FFmpeg's native decoder (which carries the VAAPI hwaccel) or the
+    // dedicated *_qsv decoder keeps the whole decode→encode pipeline on the GPU. See transcode().
+    private const FORCE_HW_DECODER = ['av1'];
+
     public function __construct(private readonly LoggerInterface $logger) {}
 
     public function findVideoFile(string $folderPath): ?\SplFileInfo
@@ -37,7 +45,7 @@ class TranscodeService
         return $largest;
     }
 
-    /** Returns ['duration' => float, 'videoHeight' => ?int, 'videoPixFmt' => ?string, 'audioStreams' => [['codec' => string, 'profile' => string], ...]] */
+    /** Returns ['duration' => float, 'videoHeight' => ?int, 'videoPixFmt' => ?string, 'videoCodec' => ?string, 'audioStreams' => [['codec' => string, 'profile' => string], ...]] */
     public function probeFile(string $filePath): array
     {
         $cmd = 'ffprobe -v quiet'
@@ -51,13 +59,15 @@ class TranscodeService
         $duration    = (float) ($data['format']['duration'] ?? 0);
         $videoHeight = null;
         $videoPixFmt = null;
+        $videoCodec  = null;
         $audioStreams = [];
 
         foreach ($data['streams'] ?? [] as $stream) {
             $type = $stream['codec_type'] ?? '';
             if ($type === 'video' && $videoHeight === null && isset($stream['height'])) {
                 $videoHeight = (int) $stream['height'];
-                $videoPixFmt = $stream['pix_fmt'] ?? null;
+                $videoPixFmt = $stream['pix_fmt']    ?? null;
+                $videoCodec  = $stream['codec_name'] ?? null;
             } elseif ($type === 'audio') {
                 $audioStreams[] = [
                     'codec'   => $stream['codec_name'] ?? '',
@@ -66,7 +76,7 @@ class TranscodeService
             }
         }
 
-        return ['duration' => $duration, 'videoHeight' => $videoHeight, 'videoPixFmt' => $videoPixFmt, 'audioStreams' => $audioStreams];
+        return ['duration' => $duration, 'videoHeight' => $videoHeight, 'videoPixFmt' => $videoPixFmt, 'videoCodec' => $videoCodec, 'audioStreams' => $audioStreams];
     }
 
     /**
@@ -124,6 +134,7 @@ class TranscodeService
         callable $onProgress,
         ?int $sourceHeight = null,
         ?string $sourcePixFmt = null,
+        ?string $sourceVideoCodec = null,
     ): void {
         $videoBitrate = $profile->getVideoBitrateKbps();
 
@@ -147,6 +158,15 @@ class TranscodeService
             array_push($args, '-hwaccel', 'qsv', '-qsv_device', '/dev/dri/renderD128', '-hwaccel_output_format', 'qsv');
         } elseif ($isVaapi) {
             array_push($args, '-hwaccel', 'vaapi', '-hwaccel_device', '/dev/dri/renderD128', '-hwaccel_output_format', 'vaapi');
+        }
+
+        // Force the hardware-capable decoder for codecs FFmpeg would otherwise hand to a software
+        // decoder (AV1 -> libdav1d), which ignores -hwaccel and breaks the GPU handoff. This must
+        // come before -i so FFmpeg applies it to the input. VAAPI uses the native decoder (it
+        // carries the VAAPI hwaccel enabled just above); QSV uses the dedicated *_qsv decoder.
+        $srcCodec = strtolower($sourceVideoCodec ?? '');
+        if (($isVaapi || $isQsv) && in_array($srcCodec, self::FORCE_HW_DECODER, true)) {
+            array_push($args, '-c:v', $isQsv ? $srcCodec . '_qsv' : $srcCodec);
         }
 
         // Map real video streams + audio + subtitles only. Uppercase 'V' excludes attached
