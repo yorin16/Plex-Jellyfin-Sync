@@ -45,7 +45,10 @@ class RsyncTransferDriver implements TransferDriverInterface
 
         // -rlt: recursive, preserve symlinks and timestamps; skip -pog (owner/group/perms)
         // which fail when the destination user isn't root.
-        $cmd = 'rsync -rlt --info=progress2 --no-inc-recursive'
+        // --chmod forces group-writable perms on the destination so Jellyfin (which
+        // runs as a different user but shares the media group via setgid) can delete
+        // items. D2775 = dirs setgid + group-write, F664 = files group-write.
+        $cmd = 'rsync -rlt --chmod=D2775,F664 --info=progress2 --no-inc-recursive'
             . ' -e ' . escapeshellarg('ssh ' . $sshArgs)
             . ' ' . escapeshellarg(rtrim($sourceAbsPath, '/') . '/')
             . ' ' . escapeshellarg($username . '@' . $host . ':' . $destPath . '/');
