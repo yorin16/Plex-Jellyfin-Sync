@@ -127,9 +127,13 @@ class TranscodeService
     ): void {
         $videoBitrate = $profile->getVideoBitrateKbps();
 
-        // Keep 10-bit sources at 10-bit — unless HDR->SDR tonemapping is on, which the
-        // filter chain outputs as 8-bit yuv420p (so `main` is correct in that case).
-        $keep10Bit = $this->isTenBitPixFmt($sourcePixFmt) && !$profile->isHdrToSdr();
+        // Match the encode bit depth to the source: 10-bit stays 10-bit (main10), 8-bit stays
+        // 8-bit (main). No 10->8 downconvert — it only adds GPU work for no gain, and pairing a
+        // 10-bit VAAPI surface (p010) with the 8-bit `main` profile aborts the encode with
+        // "No usable encoding profile found". HDR->SDR is not wired up for VAAPI, so it must not
+        // influence bit depth here; if the software tonemap path is ever implemented it will need
+        // to force `main` again since its chain outputs 8-bit yuv420p.
+        $keep10Bit = $this->isTenBitPixFmt($sourcePixFmt);
         $estimatedBytes = $duration > 0
             ? (int) (($videoBitrate + $profile->getLosslessAudioBitrateKbps()) * 1000 / 8 * $duration)
             : PHP_INT_MAX;
