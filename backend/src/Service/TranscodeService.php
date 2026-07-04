@@ -37,11 +37,11 @@ class TranscodeService
         return $largest;
     }
 
-    /** Returns ['duration' => float, 'videoHeight' => ?int, 'audioStreams' => [['codec' => string, 'profile' => string], ...]] */
+    /** Returns ['duration' => float, 'videoHeight' => ?int, 'videoPixFmt' => ?string, 'audioStreams' => [['codec' => string, 'profile' => string], ...]] */
     public function probeFile(string $filePath): array
     {
         $cmd = 'ffprobe -v quiet'
-            . ' -show_entries format=duration:stream=codec_name,profile,codec_type,height'
+            . ' -show_entries format=duration:stream=codec_name,profile,codec_type,height,pix_fmt'
             . ' -of json '
             . escapeshellarg($filePath);
 
@@ -50,12 +50,14 @@ class TranscodeService
 
         $duration    = (float) ($data['format']['duration'] ?? 0);
         $videoHeight = null;
+        $videoPixFmt = null;
         $audioStreams = [];
 
         foreach ($data['streams'] ?? [] as $stream) {
             $type = $stream['codec_type'] ?? '';
             if ($type === 'video' && $videoHeight === null && isset($stream['height'])) {
                 $videoHeight = (int) $stream['height'];
+                $videoPixFmt = $stream['pix_fmt'] ?? null;
             } elseif ($type === 'audio') {
                 $audioStreams[] = [
                     'codec'   => $stream['codec_name'] ?? '',
@@ -64,7 +66,34 @@ class TranscodeService
             }
         }
 
-        return ['duration' => $duration, 'videoHeight' => $videoHeight, 'audioStreams' => $audioStreams];
+        return ['duration' => $duration, 'videoHeight' => $videoHeight, 'videoPixFmt' => $videoPixFmt, 'audioStreams' => $audioStreams];
+    }
+
+    /**
+     * Pick the H.265/H.264 encoder profile for the source bit depth. The 8-bit `main`
+     * profile cannot carry a 10-bit stream, so a 10-bit source that stays 10-bit must
+     * use `main10` (HEVC) / `high10` (H.264) or FFmpeg aborts the encode.
+     */
+    public function resolveVideoProfile(string $videoCodec, bool $keep10Bit): string
+    {
+        if (!$keep10Bit) {
+            return 'main';
+        }
+
+        $codec  = strtolower($videoCodec);
+        $isHevc = str_contains($codec, 'hevc') || str_contains($codec, 'h265') || str_contains($codec, 'x265');
+
+        return $isHevc ? 'main10' : 'high10';
+    }
+
+    /** True when a pixel format carries more than 8 bits per component (e.g. yuv420p10le, p010le). */
+    public function isTenBitPixFmt(?string $pixFmt): bool
+    {
+        if ($pixFmt === null) {
+            return false;
+        }
+
+        return str_contains($pixFmt, '10') || str_contains($pixFmt, '12');
     }
 
     public function isLosslessAudio(array $stream): bool
@@ -94,8 +123,13 @@ class TranscodeService
         array $audioStreams,
         callable $onProgress,
         ?int $sourceHeight = null,
+        ?string $sourcePixFmt = null,
     ): void {
         $videoBitrate = $profile->getVideoBitrateKbps();
+
+        // Keep 10-bit sources at 10-bit — unless HDR->SDR tonemapping is on, which the
+        // filter chain outputs as 8-bit yuv420p (so `main` is correct in that case).
+        $keep10Bit = $this->isTenBitPixFmt($sourcePixFmt) && !$profile->isHdrToSdr();
         $estimatedBytes = $duration > 0
             ? (int) (($videoBitrate + $profile->getLosslessAudioBitrateKbps()) * 1000 / 8 * $duration)
             : PHP_INT_MAX;
@@ -148,7 +182,7 @@ class TranscodeService
             '-b:v', $videoBitrate . 'k',
             '-maxrate', (int) ($videoBitrate * 1.5) . 'k',
             '-bufsize', ($videoBitrate * 3) . 'k',
-            '-profile:v', 'main',
+            '-profile:v', $this->resolveVideoProfile($profile->getVideoCodec(), $keep10Bit),
         );
 
         // VDENC (low-power) path uses fixed-function encode hardware instead of EU-assisted PAK,

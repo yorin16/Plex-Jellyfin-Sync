@@ -86,11 +86,13 @@ class TranscodeJobHandler
         $duration     = $probeData['duration'];
         $audioStreams  = $probeData['audioStreams'];
         $sourceHeight = $probeData['videoHeight'];
+        $sourcePixFmt = $probeData['videoPixFmt'];
 
-        $this->logger->info('Transcode job {id}: duration={dur}s, source height={h}px, audio streams={n}, file={f}', [
+        $this->logger->info('Transcode job {id}: duration={dur}s, source height={h}px, pix_fmt={pf}, audio streams={n}, file={f}', [
             'id'  => $job->getId(),
             'dur' => $duration,
             'h'   => $sourceHeight ?? 'unknown',
+            'pf'  => $sourcePixFmt ?? 'unknown',
             'n'   => count($audioStreams),
             'f'   => $videoFile->getFilename(),
         ]);
@@ -133,6 +135,7 @@ class TranscodeJobHandler
                 }
             },
             $sourceHeight,
+            $sourcePixFmt,
         );
 
         $this->transcodeService->copyNonVideoFiles($sourceFolder, $outputDir, $videoFile->getFilename());
